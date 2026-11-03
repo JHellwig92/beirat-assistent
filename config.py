@@ -17,7 +17,30 @@ load_dotenv(_env_pfad)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODELL = os.getenv("GEMINI_MODELL", "gemini-2.5-flash")
 # Suchmodell lokal über Ollama (kein Tageslimit, nichts geht dafür an Google).
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+
+
+def _ollama_adresse() -> str:
+    """OLLAMA_URL aus der .env; sonst die Adresse, auf der Ollama selbst lauscht
+    (Umgebungsvariable OLLAMA_HOST, z. B. von einem anderen Programm gesetzt)."""
+    if os.getenv("OLLAMA_URL"):
+        return os.getenv("OLLAMA_URL")
+    host = (os.getenv("OLLAMA_HOST") or "").strip().rstrip("/")
+    if not host:
+        return "http://127.0.0.1:11434"
+    if "://" not in host:
+        host = "http://" + host
+    schema, rest = host.split("://", 1)
+    if rest.startswith(":"):
+        rest = "127.0.0.1" + rest
+    name, _, port = rest.rpartition(":") if rest.count(":") == 1 else (rest, "", "")
+    if not name:
+        name, port = rest, ""
+    if name in ("0.0.0.0", "", "[::]", "::"):
+        name = "127.0.0.1"
+    return f"{schema}://{name}:{port or '11434'}"
+
+
+OLLAMA_URL = _ollama_adresse()
 OLLAMA_EMBED_MODELL = os.getenv("OLLAMA_EMBED_MODELL", "qwen3-embedding:0.6b")
 # Texterkennung eingescannter Seiten: "lokal" (Ollama, kein Limit, nichts geht an
 # Google; Gemini nur als Ersatz, falls Ollama fehlt) oder "gemini".

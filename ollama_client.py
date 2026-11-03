@@ -60,29 +60,84 @@ def laeuft() -> bool:
         return False
 
 
-def starte() -> bool:
-    """Startet Ollama im Hintergrund (Windows: wie beim Anmelden, ohne Fenster)."""
-    kandidaten = []
-    lokal = os.environ.get("LOCALAPPDATA")
-    if lokal:
-        kandidaten.append([str(Path(lokal) / "Programs" / "Ollama" / "ollama app.exe")])
-        kandidaten.append([str(Path(lokal) / "Programs" / "Ollama" / "ollama.exe"), "serve"])
+def _protokolliere(text: str):
+    try:
+        import gemini_ki
+        gemini_ki.protokolliere(f"OLLAMA: {text}")
+    except Exception:
+        pass
+
+
+def _installationsordner() -> list[Path]:
+    """Mögliche Ollama-Ordner: Standardpfade, PATH und Windows-Registrierung."""
+    ordner = []
+    for var, unterpfad in (("LOCALAPPDATA", "Programs/Ollama"), ("ProgramFiles", "Ollama"),
+                           ("ProgramW6432", "Ollama"), ("ProgramFiles(x86)", "Ollama")):
+        if os.environ.get(var):
+            ordner.append(Path(os.environ[var]) / unterpfad)
     if shutil.which("ollama"):
-        kandidaten.append([shutil.which("ollama"), "serve"])
+        ordner.append(Path(shutil.which("ollama")).parent)
+    if os.name == "nt":
+        try:
+            import winreg
+            for wurzel in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                try:
+                    basis = winreg.OpenKey(wurzel, r"Software\Microsoft\Windows\CurrentVersion\Uninstall")
+                except OSError:
+                    continue
+                for i in range(winreg.QueryInfoKey(basis)[0]):
+                    try:
+                        k = winreg.OpenKey(basis, winreg.EnumKey(basis, i))
+                        if str(winreg.QueryValueEx(k, "DisplayName")[0]).lower().startswith("ollama"):
+                            ordner.append(Path(winreg.QueryValueEx(k, "InstallLocation")[0]))
+                    except OSError:
+                        continue
+        except Exception as e:
+            _protokolliere(f"Registrierung nicht lesbar: {e}")
+    eindeutig = []
+    for o in ordner:
+        if o not in eindeutig:
+            eindeutig.append(o)
+    return eindeutig
+
+
+_letzte_ursache = ""
+
+
+def starte() -> bool:
+    """Startet Ollama im Hintergrund (Windows: wie beim Anmelden, ohne Fenster).
+    Der erste Start nach dem Hochfahren kann bis zu einer Minute dauern."""
+    global _letzte_ursache
+    befehle = []
+    for o in _installationsordner():
+        if (o / "ollama app.exe").exists():
+            befehle.append([str(o / "ollama app.exe")])
+        for name in ("ollama.exe", "ollama"):
+            if (o / name).exists():
+                befehle.append([str(o / name), "serve"])
+                break
+    if not befehle:
+        _letzte_ursache = "Ollama wurde auf diesem Rechner nicht gefunden"
+        _protokolliere(f"{_letzte_ursache}. Gesucht in: "
+                       + ", ".join(str(o) for o in _installationsordner()))
+        return False
     flags = 0x00000008 | 0x08000000 if os.name == "nt" else 0   # DETACHED | NO_WINDOW
-    for befehl in kandidaten:
-        if not Path(befehl[0]).exists():
-            continue
+    for befehl in befehle:
         try:
             subprocess.Popen(befehl, creationflags=flags, stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=os.name != "nt")
-        except Exception:
+        except Exception as e:
+            _protokolliere(f"Start fehlgeschlagen {befehl}: {e}")
             continue
-        for _ in range(30):
+        _protokolliere(f"gestartet: {befehl}, warte auf {config.OLLAMA_URL}")
+        for _ in range(120):          # bis zu 60 s
             time.sleep(0.5)
             if laeuft():
+                _protokolliere("läuft")
                 return True
+        _protokolliere(f"keine Antwort nach 60 s unter {config.OLLAMA_URL}: {befehl}")
+    _letzte_ursache = f"Ollama wurde gestartet, antwortet aber nicht unter {config.OLLAMA_URL}"
     return False
 
 
@@ -103,7 +158,8 @@ def bereit(modell: str, groesse: str = "", meldung=None) -> tuple[bool, str]:
             meldung("Ollama wird gestartet …")
         if not starte():
             _fehlschlag[modell] = time.time()
-            return False, "Ollama läuft nicht und ließ sich nicht starten."
+            return False, (f"Lokale KI (Ollama) läuft nicht: {_letzte_ursache}. "
+                           "Details in beirat_daten\\einlesen.log.")
     try:
         if not _modell_vorhanden(modell):
             if meldung:
@@ -171,3 +227,33 @@ def lies_bild(bild: bytes, anweisung: str, timeout: float = 900) -> str:
         "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 4096},
     }, timeout=timeout)
     return (antwort.get("response") or "").strip()
+
+
+def diagnose():
+    """Für ollama_pruefen.bat: zeigt Schritt für Schritt, woran es hakt."""
+    print(f"Adresse:           {config.OLLAMA_URL}")
+    print(f"OLLAMA_HOST:       {os.environ.get('OLLAMA_HOST') or '(nicht gesetzt)'}")
+    ordner = _installationsordner()
+    gefunden = [o for o in ordner if (o / "ollama.exe").exists() or (o / "ollama app.exe").exists()
+                or (o / "ollama").is_file()]
+    print("Installiert in:    " + (", ".join(map(str, gefunden)) or "NICHT GEFUNDEN"))
+    if not gefunden:
+        print("  Gesucht in:      " + ", ".join(map(str, ordner)))
+    if laeuft():
+        print("Läuft:             ja")
+    else:
+        print("Läuft:             nein — starte (bis zu 1 Minute) ...")
+        print("Gestartet:         " + ("ja" if starte() else f"NEIN — {_letzte_ursache}"))
+    if laeuft():
+        try:
+            print(f"Version:           {anfrage('/api/version', timeout=5).get('version')}")
+            namen = [m.get("name") for m in anfrage("/api/tags", timeout=10).get("models", [])]
+            print("Modelle:           " + (", ".join(namen) or "(keine)"))
+            for m in (config.OLLAMA_EMBED_MODELL, config.OLLAMA_OCR_MODELL):
+                print(f"  {m:24} {'vorhanden' if m in namen else 'fehlt (wird automatisch geladen)'}")
+        except Exception as e:
+            print(f"Fehler:            {e}")
+
+
+if __name__ == "__main__":
+    diagnose()
