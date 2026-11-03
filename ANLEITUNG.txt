@@ -103,7 +103,7 @@ WENN ETWAS NICHT KLAPPT
   baut der Assistent im Hintergrund seinen Suchindex auf
   bzw. liest eingescannte Dokumente. Du kannst trotzdem
   schon fragen. Die Antworten werden besser, sobald er
-  fertig ist. Den Browser dafür einfach offen lassen.
+  fertig ist. Dafür das schwarze Fenster offen lassen.
 - Neue Dateien in den Ordner gelegt, während der Assistent
   läuft? In der Seitenleiste auf "Unterlagen jetzt neu
   prüfen" klicken.
