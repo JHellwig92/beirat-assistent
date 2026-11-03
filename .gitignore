@@ -1,0 +1,13 @@
+# Private Daten und Schlüssel — NIEMALS ins Repo
+.env
+beirat_daten/
+INFO_FUER_JENS.md
+KI Daten*/
+
+# Umgebung / Systemdateien
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+__MACOSX/
+*.update

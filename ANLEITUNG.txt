@@ -1,0 +1,119 @@
+============================================================
+  BEIRAT-ASSISTENT — ANLEITUNG
+============================================================
+
+WAS IST DAS?
+Ein Assistent, mit dem du über deine Beirats-Unterlagen
+sprechen kannst. Er liest deine PDF- und Word-Dateien und
+sucht bei Bedarf zusätzlich im Internet. Bei jeder Antwort
+zeigt er dir die Quellen — ein Klick darauf öffnet die
+Original-Datei oder die Internetseite.
+
+
+TÄGLICHE BENUTZUNG
+------------------------------------------------------------
+1. Doppelklick auf  start.bat
+2. Kurz warten — der Browser öffnet sich von selbst.
+   (Das schwarze Fenster im Hintergrund geöffnet lassen!)
+3. Unten in das Eingabefeld die Frage tippen und Enter
+   drücken. Zum Beispiel:
+   "Wer zahlt die Erneuerung der Rolltore in der Tiefgarage?"
+4. Zum Beenden: das schwarze Fenster schließen.
+
+Neue oder geänderte Dateien in deinem Unterlagen-Ordner
+werden bei jedem Start automatisch erkannt — du musst
+nichts weiter tun.
+
+UPDATES kommen ebenfalls automatisch: Gibt es eine neue
+Version, wird sie beim Start im schwarzen Fenster
+installiert ("Neue Version ... wird installiert"). Einfach
+kurz warten, danach geht es wie gewohnt weiter.
+
+
+WAS KANN DER ASSISTENT NOCH?
+------------------------------------------------------------
+- QUELLEN ÖFFNEN: Unter jeder Antwort stehen die Quellen.
+  Ein Klick auf ein Dokument öffnet die Datei direkt.
+- UNTERLAGEN-ORDNER: Links in der Seitenleiste stehen die
+  Ordner, die der Assistent durchsucht. Mit dem Häkchen
+  schaltest du einen Ordner ein oder aus — das wirkt sofort.
+  Mit "Ordner hinzufügen" kannst du weitere Ordner dazunehmen
+  (z. B. von einem USB-Stick). Der Ordner wird einmal
+  eingelesen und bleibt in der Liste, bis du ihn mit
+  "Aus Liste entfernen" wieder herausnimmst. Deine Dateien
+  werden dabei nie gelöscht.
+- NUR FÜR DIESES GESPRÄCH: Wenn du Unterlagen nur für eine
+  einzelne Frage oder Sitzung brauchst, kannst du sie in der
+  Seitenleiste unter "Nur für dieses Gespräch" hochladen
+  (oder einen Ordner wählen). Der Assistent schaut dann in
+  diesem Gespräch zuerst dort hinein. In anderen Gesprächen
+  tauchen diese Dateien nicht auf.
+- DOKUMENTE VERGLEICHEN: In der Seitenleiste auf "Zwei
+  Dokumente vergleichen" klicken, zwei Dokumente auswählen
+  (oder hochladen) und auf "Vergleichen" klicken. Der
+  Vergleich erscheint als Antwort im Gespräch — du kannst
+  danach Rückfragen stellen oder ihn als PDF speichern.
+- INTERNETSUCHE: Links in der Seitenleiste einstellbar
+  (Automatisch / Immer / Nie).
+- E-MAIL: In der Seitenleiste auf "Gespräch zusammenfassen"
+  klicken — dann "Im E-Mail-Programm öffnen". Die
+  Zusammenfassung steht dann fertig in einer neuen E-Mail.
+- FRÜHERE GESPRÄCHE FORTSETZEN: In der Seitenleiste unter
+  "Frühere Gespräche" stehen alle bisherigen Unterhaltungen.
+  Draufklicken zeigt die alten Fragen und Antworten. Mit dem
+  Knopf "Gespräch fortsetzen" wird die Unterhaltung wieder
+  geöffnet — du kannst direkt weiterfragen, als hättest du
+  nie aufgehört.
+- ALS PDF SPEICHERN: Unter jeder Antwort auf "Als PDF speichern"
+  klicken. Du kannst wählen, wie der Inhalt aufbereitet wird
+  (z. B. als Beschlussvorlage, als Liste oder als Brief) oder
+  bei "Eigene Anweisung" frei beschreiben, wie es aussehen soll —
+  auch mit Farben und Gestaltung, z. B. "als Flyer in Pink
+  gehalten" oder "als Tabelle, dezent in Blau". Dann auf
+  "PDF erstellen" und danach "PDF speichern unter …" klicken.
+  In der Seitenleiste unter "Gespräch als PDF" lässt sich auch
+  das ganze Gespräch auf einmal als PDF speichern (dort immer
+  im normalen, unveränderten Layout).
+  TIPP: Damit der Browser wirklich nach dem Speicherort fragt
+  (statt automatisch in "Downloads" zu speichern), einmalig in
+  den Browser-Einstellungen "Vor dem Download jedes Mal
+  Speicherort abfragen" aktivieren (bei Chrome/Edge unter
+  Einstellungen → Downloads).
+
+
+WENN ETWAS NICHT KLAPPT
+------------------------------------------------------------
+- Browser öffnet sich nicht? Im Browser von Hand eingeben:
+  localhost:8531
+- Fehlermeldung beim normalen Betrieb? Alles schließen und
+  start.bat noch einmal doppelklicken.
+  Hilft das nicht: bei der Person melden, die den
+  Assistenten eingerichtet hat.
+- Fehlermeldung direkt nach der Einrichtung (rote Schrift
+  im schwarzen Fenster)? einrichten.bat noch einmal
+  doppelklicken — das behebt die meisten Einrichtungsfehler
+  automatisch. Hilft das nicht: bei der Person melden,
+  die den Assistenten eingerichtet hat.
+- Meldung "kostenlose KI-Stufe ausgeschöpft"? Eine Minute
+  warten und die Frage noch einmal stellen.
+- Beim Start erscheint ein Balken "Unterlagen werden
+  eingelesen"? Das passiert, wenn neue Dateien dazugekommen
+  sind. Einfach abwarten. Eingescannte Dokumente dauern
+  etwas länger, weil die KI sie lesen muss.
+- Neue Dateien in den Ordner gelegt, während der Assistent
+  läuft? In der Seitenleiste auf "Unterlagen jetzt neu
+  prüfen" klicken.
+
+WICHTIG: Die Antworten sind eine Hilfe zur Orientierung —
+sie ersetzen keine Rechtsberatung.
+
+
+ERSTE EINRICHTUNG (nur einmal nötig)
+------------------------------------------------------------
+1. Doppelklick auf  einrichten.bat  — installiert alles
+   Nötige automatisch (braucht Internet, dauert ein paar
+   Minuten).
+2. Den Fragen im Fenster folgen:
+   - Google-KI-Schlüssel (kostenlos, Anleitung erscheint)
+   - Ordner mit den Unterlagen angeben
+3. Danach täglich nur noch  start.bat  doppelklicken.
