@@ -107,13 +107,13 @@ def speichere_verlauf(verlauf: list):
     )
 
 
-def loesche_gespraech(collection, gespraechs_id: str):
+def loesche_gespraech(gespraechs_id: str):
     """Entfernt alle Verlaufseinträge einer Gespräch-ID unwiderruflich —
     samt den Quellen, die nur für dieses Gespräch hinzugefügt wurden."""
     verlauf = lade_verlauf()
     verlauf = [e for e in verlauf if e["gespraechs_id"] != gespraechs_id]
     speichere_verlauf(verlauf)
-    pdf_indexer.entferne_alle_gespraechs_quellen(collection, gespraechs_id)
+    pdf_indexer.entferne_alle_gespraechs_quellen(gespraechs_id)
 
 
 def speichere_im_verlauf(frage: str, antwort: str, doks: list[dict], webs: list[dict]):
@@ -210,12 +210,6 @@ def aktualisiere_wissensstand(verlauf: list):
 
 # ── Suche & Antwort ───────────────────────────────────────────────────────────
 
-@st.cache_resource
-def hole_collection():
-    _, collection = pdf_indexer.erstelle_client()
-    return collection
-
-
 def baue_kontext(doks: list[dict], webs: list[dict]) -> str:
     teile = []
     if doks:
@@ -243,8 +237,8 @@ def baue_gespraechskontext() -> str:
     return "\n".join(teile) + "\n\n"
 
 
-def beantworte_frage(collection, frage: str, web_modus: str):
-    doks = suche.suche_dokumente(collection, frage, st.session_state.gespraechs_id)
+def beantworte_frage(frage: str, web_modus: str):
+    doks = suche.suche_dokumente(frage, st.session_state.gespraechs_id)
     webs = []
     if web_modus == "Immer":
         webs = websuche.suche_web(frage)
@@ -367,9 +361,27 @@ def pdf_export_ui(
 
 SCAN_HINWEIS = (
     "Eingescannte Dokumente werden dabei von der KI gelesen. Das kann einige "
-    "Minuten dauern (bei vielen Unterlagen auch länger). Bitte das schwarze Fenster "
-    "und den Browser geöffnet lassen."
+    "Minuten dauern. Bitte das schwarze Fenster und den Browser geöffnet lassen."
 )
+
+
+@st.fragment(run_every=15)
+def hintergrund_anzeige():
+    """Fortschritt von Stufe 2 (Scans + Suchindex) — aktualisiert sich alle 15 s selbst."""
+    f = pdf_indexer.fortschritt_stufe2()
+    if f["abschnitte"] and f["mit_vektor"] < f["abschnitte"]:
+        st.progress(
+            f["mit_vektor"] / f["abschnitte"],
+            text=f"🔎 Suchindex: {f['mit_vektor']} von {f['abschnitte']} Abschnitten",
+        )
+        st.caption("Bis er fertig ist, findet der Assistent Unterlagen über Stichworte — "
+                   "fragen geht also schon.")
+    if f["scans_offen"]:
+        st.caption(f"📄 {f['scans_offen']} eingescannte Datei(en) warten noch auf die Texterkennung.")
+    if f["laeuft"] and f["aufgabe"]:
+        st.caption(f"⏳ {f['aufgabe']}")
+    if f["hinweis"]:
+        st.info(f["hinweis"])
 
 
 def fortschritts_box(titel: str, hinweis: str = ""):
@@ -392,7 +404,7 @@ def fortschritts_box(titel: str, hinweis: str = ""):
     return platz, fortschritt, meldung
 
 
-def indexiere_mit_anzeige(collection, nur_ordner: str | None = None) -> dict:
+def indexiere_mit_anzeige(nur_ordner: str | None = None) -> dict:
     """Prüft/liest die Unterlagen ein und zeigt dabei einen Fortschrittsbalken."""
     if nur_ordner:
         titel = f"📂 **Neuer Ordner „{Path(nur_ordner).name}“ wird eingelesen …**"
@@ -400,10 +412,12 @@ def indexiere_mit_anzeige(collection, nur_ordner: str | None = None) -> dict:
         titel = "📂 **Unterlagen werden auf Änderungen geprüft …**"
     hinweis = ""
     if not pdf_indexer.anzahl_eingelesen() or nur_ordner:
-        hinweis = SCAN_HINWEIS + " Falls doch unterbrochen wird: Beim nächsten Start geht es dort weiter."
+        hinweis = ("Die Dateien werden gelesen — das geht meist in ein bis zwei Minuten. "
+                   "Eingescannte Dokumente und der Suchindex werden danach im Hintergrund "
+                   "fertiggestellt, während du schon fragen kannst.")
     platz, fortschritt, meldung = fortschritts_box(titel, hinweis)
     try:
-        status = pdf_indexer.pruefe_und_aktualisiere(collection, fortschritt, meldung, nur_ordner)
+        status = pdf_indexer.pruefe_und_aktualisiere(fortschritt, meldung, nur_ordner)
     except Exception as e:
         status = {"fehler": str(e)}
     platz.empty()
@@ -412,37 +426,41 @@ def indexiere_mit_anzeige(collection, nur_ordner: str | None = None) -> dict:
 
 # ── Quellen nur für dieses Gespräch ───────────────────────────────────────────
 
-def gespraechs_quellen_einlesen(collection, pfade: list[str]):
+def gespraechs_quellen_einlesen(pfade: list[str]):
     """Liest Dateien/Ordner für das aktuelle Gespräch ein (mit Fortschrittsanzeige)."""
     gid = st.session_state.gespraechs_id
     platz, fortschritt, meldung = fortschritts_box(
         "📎 **Quellen für dieses Gespräch werden eingelesen …**", SCAN_HINWEIS
     )
-    ok, ohne_text, fehler = [], [], []
+    ok, ohne_text, fehler, wartet = [], [], [], []
     for pfad in pfade:
         try:
-            erg = pdf_indexer.fuege_gespraechs_quelle_hinzu(collection, gid, pfad, fortschritt, meldung)
+            erg = pdf_indexer.fuege_gespraechs_quelle_hinzu(gid, pfad, fortschritt, meldung)
         except Exception as e:
             fehler.append(f"{Path(pfad).name} ({str(e)[:80]})")
             continue
         ok += erg["ok"]
         ohne_text += erg["ohne_text"]
         fehler += erg["fehler"]
+        wartet += erg["scan_wartet"]
     platz.empty()
     meldungen = []
     if ok:
         meldungen.append(("success", f"Für dieses Gespräch bereit: {', '.join(ok)}"))
     if ohne_text:
         meldungen.append(("warning", f"Kein lesbarer Text gefunden in: {', '.join(ohne_text)}"))
+    if wartet:
+        meldungen.append(("info", f"Das Tageslimit der KI ist erreicht — diese Scans werden "
+                                  f"gelesen, sobald es wieder geht: {', '.join(wartet)}"))
     if fehler:
         meldungen.append(("error", f"Konnte nicht eingelesen werden: {', '.join(fehler)} — "
                                    "bitte später noch einmal versuchen."))
-    if not (ok or ohne_text or fehler):
+    if not (ok or ohne_text or fehler or wartet):
         meldungen.append(("warning", "In der Auswahl waren keine PDF-, Word- oder Textdateien."))
     st.session_state.quellen_meldungen = meldungen
 
 
-def gespraechs_quellen_ui(collection):
+def gespraechs_quellen_ui():
     st.subheader("📎 Nur für dieses Gespräch")
     st.caption("Dateien oder Ordner, die nur in diesem Gespräch durchsucht werden — "
                "z. B. Unterlagen für eine einzelne Sitzung.")
@@ -457,7 +475,7 @@ def gespraechs_quellen_ui(collection):
         spalte_name.markdown(f"{symbol} {q['name']}{zusatz}")
         schluessel = hashlib.md5(q["pfad"].encode()).hexdigest()[:10]
         if spalte_weg.button("✖", key=f"gq_weg_{schluessel}", help="Aus diesem Gespräch entfernen"):
-            pdf_indexer.entferne_gespraechs_quelle(collection, gid, q["pfad"])
+            pdf_indexer.entferne_gespraechs_quelle(gid, q["pfad"])
             st.rerun()
 
     zaehler = st.session_state.setdefault("upload_zaehler", 0)
@@ -505,7 +523,7 @@ def _dokument_wahl(spalte, buchstabe: str, auswahl: list[dict]) -> str | None:
 
 
 @st.dialog("⚖️ Dokumente vergleichen", width="large")
-def vergleich_dialog(collection):
+def vergleich_dialog():
     gid = st.session_state.gespraechs_id
     auswahl = pdf_indexer.alle_dokumente(gid)
     st.caption("Zwei Dokumente wählen — aus den Unterlagen oder per Hochladen. "
@@ -531,7 +549,7 @@ def vergleich_dialog(collection):
             datei = st.session_state[f"vgl_upload_{buchstabe}"]
             pfad = str(pdf_indexer.speichere_upload(gid, datei.name, datei.getvalue()))
             try:
-                pdf_indexer.fuege_gespraechs_quelle_hinzu(collection, gid, pfad)
+                pdf_indexer.fuege_gespraechs_quelle_hinzu(gid, pfad)
             except Exception:
                 pass   # Vergleich klappt trotzdem; nur Rückfragen finden die Datei dann nicht
             pfade.append(pfad)
@@ -594,7 +612,7 @@ def ordner_hinzufuegen(pfad: str):
         st.warning(meldung)
 
 
-def ordner_ui(collection):
+def ordner_ui():
     st.subheader("📁 Unterlagen-Ordner")
     st.caption("Häkchen = wird bei Fragen durchsucht. Umschalten wirkt sofort.")
     zaehler = pdf_indexer.dateien_pro_ordner()
@@ -620,7 +638,7 @@ def ordner_ui(collection):
                 st.warning(f"Ordner „{name}“ aus der Liste entfernen? Die Dateien selbst bleiben erhalten.")
                 ja, nein = st.columns(2)
                 if ja.button("Ja, entfernen", key=f"{frage_key}_ja"):
-                    pdf_indexer.entferne_ordner(collection, o["pfad"])
+                    pdf_indexer.entferne_ordner(o["pfad"])
                     st.session_state.pop(frage_key, None)
                     st.rerun()
                 if nein.button("Abbrechen", key=f"{frage_key}_nein"):
@@ -680,7 +698,6 @@ if not config.GEMINI_API_KEY:
     )
     st.stop()
 
-collection = hole_collection()
 
 if "chat" not in st.session_state:
     st.session_state.chat = []
@@ -690,15 +707,18 @@ if "gespraechs_id" not in st.session_state:
 
 if st.session_state.get("neuer_ordner"):
     st.session_state.index_status = indexiere_mit_anzeige(
-        collection, nur_ordner=st.session_state.pop("neuer_ordner")
+        nur_ordner=st.session_state.pop("neuer_ordner")
     )
     st.rerun()
 
 if "index_status" not in st.session_state:
-    st.session_state.index_status = indexiere_mit_anzeige(collection)
+    st.session_state.index_status = indexiere_mit_anzeige()
+
+# Stufe 2 (Scans lesen, Suchvektoren) läuft im Hintergrund weiter
+pdf_indexer.starte_hintergrund()
 
 if st.session_state.get("neue_gespraechs_quellen"):
-    gespraechs_quellen_einlesen(collection, st.session_state.pop("neue_gespraechs_quellen"))
+    gespraechs_quellen_einlesen(st.session_state.pop("neue_gespraechs_quellen"))
     st.rerun()
 
 status = st.session_state.index_status
@@ -713,12 +733,7 @@ with st.sidebar:
                 f"Gerade aktualisiert: {status['neu']} neu, "
                 f"{status['aktualisiert']} geändert, {status['geloescht']} entfernt"
             )
-        if status.get("kontingent"):
-            st.warning(
-                f"{status['offen']} Datei(en) konnten heute noch nicht eingelesen werden — "
-                "das Tageslimit der kostenlosen KI ist erreicht. Sie werden beim nächsten "
-                "Start automatisch nachgeholt."
-            )
+        hintergrund_anzeige()
         if status.get("fehler"):
             with st.expander(f"⚠️ {len(status['fehler'])} Datei(en) nicht einlesbar"):
                 st.caption("Wird beim nächsten Start automatisch erneut versucht.")
@@ -731,9 +746,9 @@ with st.sidebar:
                     st.markdown(f"- {name}")
 
     st.divider()
-    ordner_ui(collection)
+    ordner_ui()
     st.divider()
-    gespraechs_quellen_ui(collection)
+    gespraechs_quellen_ui()
     st.divider()
     st.subheader("⚖️ Dokumente vergleichen")
     vergleich_oeffnen = st.button("Zwei Dokumente vergleichen …")
@@ -818,7 +833,7 @@ with st.sidebar:
                 st.warning("Dieses Gespräch wirklich unwiderruflich löschen?")
                 spalte_ja, spalte_nein = st.columns(2)
                 if spalte_ja.button("Ja, löschen", key=f"{loesch_key}_ja"):
-                    loesche_gespraech(collection, gruppe["id"])
+                    loesche_gespraech(gruppe["id"])
                     st.session_state.pop(loesch_key, None)
                     if aktiv:
                         st.session_state.chat = []
@@ -851,7 +866,7 @@ with st.sidebar:
     st.caption("Hinweis: Die Antworten ersetzen keine Rechtsberatung.")
 
 if vergleich_oeffnen:
-    vergleich_dialog(collection)
+    vergleich_dialog()
 
 # Bisherige Nachrichten dieser Sitzung anzeigen
 for idx, nachricht in enumerate(st.session_state.chat):
@@ -877,7 +892,7 @@ if frage:
     with st.chat_message("assistant"):
         try:
             with st.spinner("Unterlagen werden durchsucht und Antwort erstellt …"):
-                antwort, doks, webs = beantworte_frage(collection, frage, web_modus)
+                antwort, doks, webs = beantworte_frage(frage, web_modus)
         except Exception as e:
             antwort = fehlertext_ki(e)
             doks, webs = [], []

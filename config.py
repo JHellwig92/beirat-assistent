@@ -16,18 +16,14 @@ load_dotenv(_env_pfad)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODELL = os.getenv("GEMINI_MODELL", "gemini-2.5-flash")
-# Mehrsprachiges Suchmodell (versteht Deutsch deutlich besser als das
-# englische Standardmodell von ChromaDB). Gleicher API-Schlüssel.
-GEMINI_EMBED_MODELL = os.getenv("GEMINI_EMBED_MODELL", "gemini-embedding-001")
-EMBED_DIMENSIONEN = 768
+# Suchmodell lokal über Ollama (kein Tageslimit, nichts geht dafür an Google).
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_EMBED_MODELL = os.getenv("OLLAMA_EMBED_MODELL", "qwen3-embedding:0.6b")
 
-# Tempo beim Einlesen — knapp unter den Limits der kostenlosen Gemini-Stufe
-# (Stand 2025: 2.5 Flash ca. 10 Anfragen/Min., Embedding ca. 100 Anfragen und
-# 30.000 Tokens/Min.). Mit bezahltem Zugang in der .env KI_TEMPOLIMIT=aus setzen.
+# Tempo der Texterkennung — knapp unter dem Minutenlimit der kostenlosen
+# Gemini-Stufe. Mit bezahltem Zugang in der .env KI_TEMPOLIMIT=aus setzen.
 KI_TEMPOLIMIT = os.getenv("KI_TEMPOLIMIT", "an").strip().lower() not in ("aus", "0", "nein", "false")
 TEMPO_TEXT_ANFRAGEN = 8
-TEMPO_EMBED_ANFRAGEN = 80
-TEMPO_EMBED_TOKENS = 25_000
 PDF_ORDNER = Path(os.getenv("PDF_ORDNER", "."))
 LAND = os.getenv("LAND", "DE")
 

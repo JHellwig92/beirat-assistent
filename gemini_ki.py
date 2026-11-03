@@ -1,4 +1,4 @@
-"""Anbindung an Google Gemini (google-genai SDK): Chat, Texterkennung, Suchvektoren."""
+"""Anbindung an Google Gemini (google-genai SDK): Chat und Texterkennung."""
 import re
 import time
 from datetime import datetime
@@ -104,11 +104,6 @@ class _Tempo:
 
 
 _tempo_text = _Tempo(config.TEMPO_TEXT_ANFRAGEN, 200_000)
-_tempo_embed = _Tempo(config.TEMPO_EMBED_ANFRAGEN, config.TEMPO_EMBED_TOKENS)
-
-
-def _geschaetzte_tokens(texte: list[str]) -> int:
-    return int(sum(len(t) for t in texte) / 3.2) + 10 * len(texte)   # deutsch: eher vorsichtig
 
 
 def frage_ki(prompt: str, system: str | None = None) -> str:
@@ -125,45 +120,6 @@ def frage_ki(prompt: str, system: str | None = None) -> str:
         ),
     )
     return (antwort.text or "").strip()
-
-
-# ── Suchvektoren (Embeddings) ─────────────────────────────────────────────────
-
-_EMBED_PAKET = 20   # klein genug, dass ein Paket nie allein das Minutenlimit sprengt
-
-
-def bette_ein(texte: list[str], fuer_suchanfrage: bool = False, meldung=None) -> list[list[float]]:
-    """Wandelt Texte in Suchvektoren um (mehrsprachiges Gemini-Modell).
-    Dokument-Abschnitte und Suchanfragen werden unterschiedlich kodiert —
-    das verbessert die Trefferqualität."""
-    from google.genai import types
-
-    client = _hole_client()
-    aufgabe = "RETRIEVAL_QUERY" if fuer_suchanfrage else "RETRIEVAL_DOCUMENT"
-    vektoren: list[list[float]] = []
-    for start in range(0, len(texte), _EMBED_PAKET):
-        paket = texte[start : start + _EMBED_PAKET]
-        teil = f"Abschnitt {start + 1}–{start + len(paket)} von {len(texte)}"
-        if meldung and len(texte) > _EMBED_PAKET:
-            meldung(f"Suchindex: {teil}")
-
-        def _aufruf(paket=paket):
-            if not fuer_suchanfrage:
-                _tempo_embed.warte(_geschaetzte_tokens(paket))
-            return client.models.embed_content(
-                model=config.GEMINI_EMBED_MODELL,
-                contents=paket,
-                config=types.EmbedContentConfig(
-                    task_type=aufgabe,
-                    output_dimensionality=config.EMBED_DIMENSIONEN,
-                ),
-            )
-
-        # Bei einer einzelnen Suchanfrage nicht minutenlang warten
-        ergebnis = mit_wiederholung(_aufruf, versuche=2 if fuer_suchanfrage else 6,
-                                    schritt=f"Suchindex, {teil}")
-        vektoren.extend(list(e.values) for e in ergebnis.embeddings)
-    return vektoren
 
 
 # ── Texterkennung für eingescannte PDFs ──────────────────────────────────────

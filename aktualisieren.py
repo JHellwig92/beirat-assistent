@@ -85,14 +85,17 @@ def _wiederherstellen(geaendert: list[str], neu_angelegt: list[str]):
 def pruefe_und_aktualisiere() -> bool:
     """Gibt True zurück, wenn ein Update eingespielt wurde."""
     if _auto_update_aus():
+        print(f"(Automatische Updates sind ausgeschaltet — Version {installierte_version()}.)")
         return False
     try:
         info = json.loads(_hole(f"https://api.github.com/repos/{REPO}/releases/latest", 8))
         neue_version = str(info["tag_name"]).lstrip("vV")
     except Exception:
-        print("(Update-Prüfung übersprungen — keine Verbindung zu GitHub.)")
+        print(f"(Update-Prüfung übersprungen — keine Verbindung zu GitHub. "
+              f"Es läuft Version {installierte_version()}.)")
         return False
     if neue_version == installierte_version():
+        print(f"✓ Version {neue_version} ist aktuell (nach Updates geschaut, keine neuen).")
         return False
 
     print("=" * 60)

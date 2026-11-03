@@ -98,8 +98,12 @@ WENN ETWAS NICHT KLAPPT
   warten und die Frage noch einmal stellen.
 - Beim Start erscheint ein Balken "Unterlagen werden
   eingelesen"? Das passiert, wenn neue Dateien dazugekommen
-  sind. Einfach abwarten. Eingescannte Dokumente dauern
-  etwas länger, weil die KI sie lesen muss.
+  sind. Einfach kurz abwarten.
+- Links steht "Suchindex: ... von ... Abschnitten"? Dann
+  baut der Assistent im Hintergrund seinen Suchindex auf
+  bzw. liest eingescannte Dokumente. Du kannst trotzdem
+  schon fragen. Die Antworten werden besser, sobald er
+  fertig ist. Den Browser dafür einfach offen lassen.
 - Neue Dateien in den Ordner gelegt, während der Assistent
   läuft? In der Seitenleiste auf "Unterlagen jetzt neu
   prüfen" klicken.
