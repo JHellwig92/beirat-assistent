@@ -5,17 +5,10 @@
 - Ist Ollama gar nicht verfügbar, funktioniert die Suche trotzdem —
   dann nur über Stichworte.
 """
-import json
-import os
-import shutil
-import subprocess
 import threading
-import time
-import urllib.error
-import urllib.request
-from pathlib import Path
 
 import config
+import ollama_client
 import textspeicher
 
 # Empfehlung von Qwen: Suchanfragen mit kurzer Aufgabenbeschreibung kodieren,
@@ -28,92 +21,24 @@ _lock = threading.RLock()
 _collection = None
 
 
-class OllamaNichtVerfuegbar(RuntimeError):
-    pass
-
-
 # ── Ollama ────────────────────────────────────────────────────────────────────
 
-def _anfrage(pfad: str, daten: dict | None = None, timeout: float = 30):
-    url = config.OLLAMA_URL.rstrip("/") + pfad
-    if daten is None:
-        req = urllib.request.Request(url)
-    else:
-        req = urllib.request.Request(url, data=json.dumps(daten).encode(),
-                                     headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
-
-
-def _laeuft() -> bool:
-    try:
-        _anfrage("/api/version", timeout=3)
-        return True
-    except Exception:
-        return False
-
-
-def _starte_ollama() -> bool:
-    """Startet Ollama im Hintergrund (Windows: wie beim Anmelden, ohne Fenster)."""
-    kandidaten = []
-    lokal = os.environ.get("LOCALAPPDATA")
-    if lokal:
-        kandidaten.append([str(Path(lokal) / "Programs" / "Ollama" / "ollama app.exe")])
-        kandidaten.append([str(Path(lokal) / "Programs" / "Ollama" / "ollama.exe"), "serve"])
-    if shutil.which("ollama"):
-        kandidaten.append([shutil.which("ollama"), "serve"])
-    flags = 0x00000008 | 0x08000000 if os.name == "nt" else 0   # DETACHED | NO_WINDOW
-    for befehl in kandidaten:
-        if not Path(befehl[0]).exists():
-            continue
-        try:
-            subprocess.Popen(befehl, creationflags=flags, stdin=subprocess.DEVNULL,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=os.name != "nt")
-        except Exception:
-            continue
-        for _ in range(30):
-            time.sleep(0.5)
-            if _laeuft():
-                return True
-    return False
-
-
-def _modell_vorhanden() -> bool:
-    namen = {m.get("name", "") for m in _anfrage("/api/tags", timeout=10).get("models", [])}
-    gesucht = config.OLLAMA_EMBED_MODELL
-    return gesucht in namen or (":" not in gesucht and f"{gesucht}:latest" in namen)
+OllamaNichtVerfuegbar = ollama_client.OllamaNichtVerfuegbar
 
 
 def bereit(meldung=None) -> tuple[bool, str]:
     """Sorgt dafür, dass Ollama läuft und das Suchmodell da ist."""
-    if not _laeuft():
-        if meldung:
-            meldung("Ollama wird gestartet …")
-        if not _starte_ollama():
-            return False, ("Ollama läuft nicht und ließ sich nicht starten. Die Suche nutzt "
-                           "bis dahin nur Stichworte.")
-    try:
-        if not _modell_vorhanden():
-            if meldung:
-                meldung(f"Suchmodell {config.OLLAMA_EMBED_MODELL} wird einmalig heruntergeladen (ca. 640 MB) …")
-            _anfrage("/api/pull", {"model": config.OLLAMA_EMBED_MODELL, "stream": False}, timeout=3600)
-    except Exception as e:
-        return False, f"Suchmodell konnte nicht geladen werden: {str(e)[:150]}"
-    return True, "bereit"
+    ok, text = ollama_client.bereit(config.OLLAMA_EMBED_MODELL, "640 MB", meldung)
+    if not ok:
+        text += " Die Suche nutzt bis dahin nur Stichworte."
+    return ok, text
 
 
 def bette_ein(texte: list[str], anfrage: bool = False, timeout: float = 300) -> list[list[float]]:
+    """Suchanfragen (anfrage=True) entladen das Modell sofort wieder."""
     if anfrage:
-        texte = [_ANFRAGE_PRAEFIX + t for t in texte]
-    try:
-        antwort = _anfrage("/api/embed", {
-            "model": config.OLLAMA_EMBED_MODELL, "input": texte, "truncate": True,
-            "keep_alive": "10m",
-        }, timeout=timeout)
-    except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as e:
-        raise OllamaNichtVerfuegbar(str(e)) from e
-    return antwort["embeddings"]
+        return ollama_client.bette_ein([_ANFRAGE_PRAEFIX + t for t in texte], timeout, keep_alive=0)
+    return ollama_client.bette_ein(texte, timeout)
 
 
 # ── ChromaDB ──────────────────────────────────────────────────────────────────

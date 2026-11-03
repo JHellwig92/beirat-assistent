@@ -133,7 +133,7 @@ def suche_dokumente(frage: str, gespraechs_id: str | None = None) -> list[dict]:
 
     vektor = None
     try:
-        vektor = vektoren.bette_ein([frage], anfrage=True, timeout=20)[0]
+        vektor = vektoren.bette_ein([frage], anfrage=True, timeout=60)[0]
     except Exception as e:
         # Ollama nicht verfügbar → nur Stichwortsuche
         print(f"[!] Bedeutungssuche nicht verfügbar, nutze nur Stichworte: {str(e)[:150]}")

@@ -8,8 +8,11 @@ Zwei Stufen, damit der Assistent nie mit leerer Datenbank dasteht:
       erkannte Scans kommen in eine Warteschlange.
 
   Stufe 2 (im Hintergrund, während man schon arbeiten kann):
-      a) Texterkennung der wartenden Scans über Gemini (Tageslimit → morgen weiter)
-      b) Suchvektoren lokal über Ollama (qwen3-embedding, kein Limit)
+      a) Suchvektoren lokal über Ollama (qwen3-embedding, kein Limit)
+      b) Texterkennung der wartenden Scans lokal über Ollama (qwen3-vl);
+         nur falls das nicht geht, über Gemini (Tageslimit → morgen weiter)
+      c) Suchvektoren für den erkannten Text
+  Danach werden die lokalen Modelle sofort entladen (Grafikkarte wieder frei).
 
 Neben dem Hauptordner (PDF_ORDNER aus der .env) kann der Nutzer weitere Ordner
 hinzufügen und jeden Ordner ein- und ausschalten. Eingelesen werden immer alle
@@ -29,6 +32,7 @@ from docx import Document
 
 import config
 import gemini_ki
+import ollama_client
 import textspeicher
 import vektoren
 
@@ -207,30 +211,95 @@ def _erkenne_gruppe(doc, gruppe: list[int]) -> dict[int, str]:
     return dict(zip(gruppe, texte))
 
 
+_OCR_LOKAL_ANWEISUNG = """Lies diese eingescannte Seite aus den Unterlagen einer
+Wohnungseigentümergemeinschaft und gib ihren Text vollständig und wortgetreu wieder.
+- Nichts zusammenfassen, nichts weglassen, nichts hinzufügen.
+- Tabellen als Markdown-Tabelle.
+- Bei Plänen oder Zeichnungen alle lesbaren Beschriftungen (Nummern, Flächen, Maße, Legende).
+- Unleserliches als [unleserlich]. Leere Seite: nur [leer].
+- Keine Einleitung, keine Erklärungen."""
+
+
+def _ocr_lokal_moeglich() -> bool:
+    return config.TEXTERKENNUNG == "lokal"
+
+
+def _seite_als_bild(doc, nr: int) -> bytes:
+    seite = doc[nr - 1]
+    zoom = config.OCR_DPI / 72
+    groesste = max(seite.rect.width, seite.rect.height) * zoom
+    if groesste > 2000:            # große Pläne (A3/A2) begrenzen
+        zoom *= 2000 / groesste
+    return seite.get_pixmap(matrix=fitz.Matrix(zoom, zoom), colorspace=fitz.csGRAY).tobytes("png")
+
+
+def _bereinige(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        text = text.rsplit("```", 1)[0]
+    text = text.strip()
+    return "" if text == "[leer]" else text
+
+
+def _erkenne_lokal(doc, nr: int) -> str:
+    return _bereinige(ollama_client.lies_bild(_seite_als_bild(doc, nr), _OCR_LOKAL_ANWEISUNG))
+
+
 def _texterkennung(pfad: Path, doc, scan_seiten: list[int], ocr: bool, meldung=None) -> dict[int, str]:
     """Erkannter Text der Scan-Seiten — aus dem Zwischenspeicher oder (wenn ocr=True)
-    frisch von Gemini. Bei ocr=False und leerem Zwischenspeicher: ScanWartet."""
+    frisch erkannt: lokal über Ollama (Seite für Seite, jede Seite wird sofort
+    gespeichert — ein Abbruch kostet nichts), ersatzweise über Gemini.
+    Bei ocr=False und unvollständigem Zwischenspeicher: ScanWartet."""
     cache_datei = config.OCR_CACHE_ORDNER / f"{_datei_hash(pfad)}.json"
+    ergebnis: dict[int, str] = {}
     if cache_datei.exists():
         try:
             gespeichert = json.loads(cache_datei.read_text(encoding="utf-8"))
-            return {int(k): v for k, v in gespeichert["seiten"].items()}
+            ergebnis = {int(k): v for k, v in gespeichert["seiten"].items()}
+            if gespeichert.get("fertig", True):     # ältere Einträge: immer vollständig
+                return ergebnis
         except Exception:
-            pass
-    if not ocr or not config.GEMINI_API_KEY:
+            ergebnis = {}
+    offen = [nr for nr in scan_seiten if nr not in ergebnis]
+    if not offen:
+        return ergebnis
+    if not ocr:
         raise ScanWartet()
 
-    ergebnis: dict[int, str] = {}
-    schritt = config.OCR_SEITEN_PRO_ANFRAGE
-    for start in range(0, len(scan_seiten), schritt):
-        gruppe = scan_seiten[start : start + schritt]
-        if meldung:
-            meldung(f"Texterkennung {pfad.name}: Seite {gruppe[0]}–{gruppe[-1]} von {len(doc)}")
-        ergebnis.update(_erkenne_gruppe(doc, gruppe))
+    def speichere(fertig: bool):
+        tmp = cache_datei.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"datei": str(pfad), "fertig": fertig, "seiten": ergebnis},
+                                  ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, cache_datei)
 
-    cache_datei.write_text(
-        json.dumps({"datei": str(pfad), "seiten": ergebnis}, ensure_ascii=False), encoding="utf-8"
-    )
+    if _ocr_lokal_moeglich():
+        ok, text = ollama_client.bereit(config.OLLAMA_OCR_MODELL, "3,3 GB", meldung)
+        if not ok:
+            gemini_ki.protokolliere(f"LOKALE TEXTERKENNUNG NICHT VERFÜGBAR: {text}")
+        while ok and offen:
+            nr = offen[0]
+            if meldung:
+                meldung(f"Texterkennung (lokal) {pfad.name}: Seite {nr} von {len(doc)}")
+            try:
+                ergebnis[nr] = _erkenne_lokal(doc, nr)
+            except Exception as e:
+                gemini_ki.protokolliere(f"LOKALE TEXTERKENNUNG FEHLGESCHLAGEN {pfad} S. {nr}: {e}")
+                ollama_client.vergiss(config.OLLAMA_OCR_MODELL)
+                break
+            offen.pop(0)
+            speichere(fertig=not offen)
+
+    if offen:   # Ersatzweg: Gemini
+        if not config.GEMINI_API_KEY:
+            raise ScanWartet()
+        schritt = config.OCR_SEITEN_PRO_ANFRAGE
+        for start in range(0, len(offen), schritt):
+            gruppe = offen[start : start + schritt]
+            if meldung:
+                meldung(f"Texterkennung (Gemini) {pfad.name}: Seite {gruppe[0]}–{gruppe[-1]} von {len(doc)}")
+            ergebnis.update(_erkenne_gruppe(doc, gruppe))
+            speichere(fertig=start + schritt >= len(offen))
     return ergebnis
 
 
@@ -468,6 +537,7 @@ def fuege_gespraechs_quelle_hinzu(gespraechs_id: str, pfad: str, fortschritt=Non
         })
         daten[gespraechs_id] = liste
         _speichere_gespraech_quellen(daten)
+    ki_freigeben()
     return ergebnis
 
 
@@ -650,9 +720,14 @@ def _ocr_heute_gesperrt() -> bool:
     return textspeicher.meta("ocr_gesperrt_am") == date.today().isoformat()
 
 
+def _ocr_moeglich() -> bool:
+    gemini = bool(config.GEMINI_API_KEY) and not _ocr_heute_gesperrt()
+    return _ocr_lokal_moeglich() or gemini
+
+
 def _ocr_schritt(meldung=None) -> bool:
     """Erkennt EINE wartende Datei. Gibt False zurück, wenn nichts zu tun ist."""
-    if _ocr_heute_gesperrt() or not config.GEMINI_API_KEY:
+    if not _ocr_moeglich():
         return False
     eintrag = textspeicher.ocr_naechster()
     if not eintrag:
@@ -662,8 +737,14 @@ def _ocr_schritt(meldung=None) -> bool:
         textspeicher.ocr_erledigt(pfad, ordner)
         return True
     _setze(aufgabe=f"Texterkennung: {Path(pfad).name}")
+
+    def melde(text):
+        _setze(aufgabe=text)
+        if meldung:
+            meldung(text)
+
     try:
-        anzahl, wartet = _indexiere_datei(Path(pfad), ordner, ocr=True, meldung=meldung)
+        anzahl, wartet = _indexiere_datei(Path(pfad), ordner, ocr=True, meldung=melde)
     except gemini_ki.TagesKontingentErschoepft:
         textspeicher.setze_meta("ocr_gesperrt_am", date.today().isoformat())
         _setze(hinweis="Tageslimit der kostenlosen KI für die Texterkennung erreicht — "
@@ -677,8 +758,12 @@ def _ocr_schritt(meldung=None) -> bool:
             textspeicher.ocr_erledigt(pfad, ordner)
             _status_im_manifest(pfad, ordner, "fehler")
         return True
-    if not wartet:
-        _status_im_manifest(pfad, ordner, "ok" if anzahl else "ohne_text", anzahl)
+    if wartet:
+        # Weder lokal noch über Gemini möglich — später erneut versuchen
+        _setze(hinweis="Texterkennung gerade nicht möglich (lokale KI nicht erreichbar) — "
+                       "wird später erneut versucht.")
+        return False
+    _status_im_manifest(pfad, ordner, "ok" if anzahl else "ohne_text", anzahl)
     return True
 
 
@@ -731,20 +816,39 @@ def _vektor_schritt(meldung=None) -> int:
 
 
 def arbeite_stufe2(meldung=None, stop: threading.Event | None = None) -> dict:
-    """Erledigt Texterkennung und Suchvektoren, bis alles fertig ist (oder ein Limit
-    greift bzw. Ollama fehlt). Kann jederzeit abgebrochen werden — es geht beim
-    nächsten Mal dort weiter."""
+    """Erledigt Suchvektoren und Texterkennung, bis alles fertig ist (oder ein Limit
+    greift bzw. Ollama fehlt). Reihenfolge: erst Vektoren für vorhandenen Text,
+    dann alle Scans, dann Vektoren für den erkannten Text — so muss die Grafikkarte
+    nicht ständig zwischen den beiden Modellen wechseln. Am Ende werden die Modelle
+    entladen. Kann jederzeit abgebrochen werden — es geht beim nächsten Mal weiter."""
+    def gestoppt():
+        return bool(stop and stop.is_set())
+
     _setze(laeuft=True)
     try:
-        while not (stop and stop.is_set()):
-            if _ocr_schritt(meldung):
-                continue
-            n = _vektor_schritt(meldung)
-            if n <= 0:
-                break
+        while not gestoppt() and _vektor_schritt(meldung) > 0:
+            pass
+        while not gestoppt() and _ocr_schritt(meldung):
+            pass
+        ollama_client.entlade(config.OLLAMA_OCR_MODELL)
+        while not gestoppt() and _vektor_schritt(meldung) > 0:
+            pass
     finally:
+        ollama_client.entlade()
         _setze(laeuft=False, aufgabe="")
     return fortschritt_stufe2()
+
+
+def hintergrund_laeuft() -> bool:
+    with _hintergrund_lock:
+        return bool(_thread and _thread.is_alive())
+
+
+def ki_freigeben():
+    """Lokale Modelle nach einem Arbeitsgang im Vordergrund (Gesprächsquelle,
+    Vergleich) entladen — außer der Hintergrund arbeitet gerade noch damit."""
+    if not hintergrund_laeuft():
+        ollama_client.entlade()
 
 
 def starte_hintergrund():
@@ -755,11 +859,11 @@ def starte_hintergrund():
         if _thread and _thread.is_alive():
             return
     f = fortschritt_stufe2()
-    scans = f["scans_offen"] and not _ocr_heute_gesperrt()
+    scans = f["scans_offen"] and _ocr_moeglich()
     vektoren_fehlen = f["mit_vektor"] < f["abschnitte"]
     if not (scans or vektoren_fehlen):
         return
-    if not scans and f["hinweis"] and HINTERGRUND.get("_letzter_versuch", 0) > time.time() - 60:
+    if f["hinweis"] and HINTERGRUND.get("_letzter_versuch", 0) > time.time() - 60:
         return   # Ollama fehlte gerade erst — nicht bei jedem Klick neu versuchen
     HINTERGRUND["_letzter_versuch"] = time.time()
     _thread = threading.Thread(target=arbeite_stufe2, name="beirat-hintergrund", daemon=True)

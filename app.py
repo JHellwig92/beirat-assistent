@@ -450,8 +450,8 @@ def gespraechs_quellen_einlesen(pfade: list[str]):
     if ohne_text:
         meldungen.append(("warning", f"Kein lesbarer Text gefunden in: {', '.join(ohne_text)}"))
     if wartet:
-        meldungen.append(("info", f"Das Tageslimit der KI ist erreicht — diese Scans werden "
-                                  f"gelesen, sobald es wieder geht: {', '.join(wartet)}"))
+        meldungen.append(("info", f"Diese Scans konnten gerade nicht gelesen werden (lokale KI nicht "
+                                  f"erreichbar) — das wird automatisch nachgeholt: {', '.join(wartet)}"))
     if fehler:
         meldungen.append(("error", f"Konnte nicht eingelesen werden: {', '.join(fehler)} — "
                                    "bitte später noch einmal versuchen."))

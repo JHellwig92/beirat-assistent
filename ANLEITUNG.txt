@@ -104,6 +104,9 @@ WENN ETWAS NICHT KLAPPT
   bzw. liest eingescannte Dokumente. Du kannst trotzdem
   schon fragen. Die Antworten werden besser, sobald er
   fertig ist. Dafür das schwarze Fenster offen lassen.
+  Eingescannte Seiten liest der Assistent mit der
+  Grafikkarte selbst (Lüfter kann hörbar werden). Danach
+  gibt er die Grafikkarte sofort wieder frei.
 - Neue Dateien in den Ordner gelegt, während der Assistent
   läuft? In der Seitenleiste auf "Unterlagen jetzt neu
   prüfen" klicken.

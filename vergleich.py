@@ -49,12 +49,15 @@ def volltext(pfad: str, meldung=None) -> tuple[str, bool]:
 
 def vergleiche(pfad_a: str, pfad_b: str, schwerpunkt: str = "", meldung=None) -> str:
     name_a, name_b = Path(pfad_a).name, Path(pfad_b).name
-    if meldung:
-        meldung(f"Lese {name_a} …")
-    text_a, gekuerzt_a = volltext(pfad_a, meldung)
-    if meldung:
-        meldung(f"Lese {name_b} …")
-    text_b, gekuerzt_b = volltext(pfad_b, meldung)
+    try:
+        if meldung:
+            meldung(f"Lese {name_a} …")
+        text_a, gekuerzt_a = volltext(pfad_a, meldung)
+        if meldung:
+            meldung(f"Lese {name_b} …")
+        text_b, gekuerzt_b = volltext(pfad_b, meldung)
+    finally:
+        pdf_indexer.ki_freigeben()   # lokale Texterkennung entladen
 
     leer = [n for n, t in ((name_a, text_a), (name_b, text_b)) if not t.strip()]
     if leer:

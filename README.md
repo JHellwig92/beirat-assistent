@@ -5,15 +5,17 @@ Er durchsucht die eigenen Unterlagen (PDF, Word, Text, auch eingescannte Dokumen
 beantwortet Fragen mit Quellenangabe und kann zusätzlich im Internet suchen.
 
 Läuft unter Windows als Browser-App (Streamlit). Für die Antworten dient Google Gemini,
-dafür reicht ein kostenloser API-Schlüssel. Die Dokumentsuche läuft lokal über
-[Ollama](https://ollama.com) mit `qwen3-embedding` (kein Tageslimit). Index, Verlauf und
-Einstellungen bleiben auf dem Rechner. An Gemini gehen die jeweils relevanten
-Textauszüge, beim Einlesen eingescannter Dokumente und beim Dokumentenvergleich auch
-ganze Dokumente.
+dafür reicht ein kostenloser API-Schlüssel. Das Einlesen läuft komplett lokal über
+[Ollama](https://ollama.com): Suchvektoren mit `qwen3-embedding`, Texterkennung von
+Scans mit dem Vision-Modell `qwen3-vl` (kein Tageslimit; eine Grafikkarte mit ≥ 6 GB
+beschleunigt das deutlich). Die Modelle werden nach jedem Arbeitsgang sofort wieder
+entladen. Index, Verlauf und Einstellungen bleiben auf dem Rechner. An Gemini gehen
+die jeweils relevanten Textauszüge, beim Dokumentenvergleich die beiden Dokumente.
 
 ## Funktionen
 - Fragen zu den eigenen Unterlagen. Jede Quelle lässt sich per Klick öffnen.
-- Texterkennung für eingescannte PDFs (über Gemini, mit Zwischenspeicher).
+- Texterkennung für eingescannte PDFs (lokal mit `qwen3-vl`, Zwischenspeicher je Seite;
+  Gemini nur als Ersatz, falls Ollama fehlt).
 - Mehrere Unterlagen-Ordner mit Ein/Aus-Schalter.
 - Dateien oder Ordner nur für ein einzelnes Gespräch.
 - Dokumentenvergleich (zwei Dokumente, mit optionalem Schwerpunkt).
@@ -27,8 +29,9 @@ ganze Dokumente.
    z. B. nach `C:\BeiratAssistent`.
 2. Unter <https://aistudio.google.com/apikey> einen kostenlosen Gemini-API-Schlüssel erstellen.
    [Ollama](https://ollama.com/download) installieren (empfohlen). Das Suchmodell lädt der
-   Assistent beim ersten Start selbst herunter (ca. 640 MB). Ohne Ollama funktioniert die
-   Suche nur über Stichworte.
+   Assistent beim ersten Start selbst herunter (ca. 640 MB Suchmodell, 3,3 GB für die
+   Texterkennung). Ohne Ollama funktioniert die Suche nur über Stichworte, und Scans
+   werden über Gemini gelesen.
 3. `einrichten.bat` doppelklicken und den Schritten folgen (Schlüssel, Unterlagen-Ordner).
 4. Danach täglich nur noch `start.bat` doppelklicken.
 
@@ -58,7 +61,9 @@ Nur Releases werden ausgeliefert, normale Pushes auf `main` nicht.
 | `GEMINI_MODELL` | Chat-Modell, Standard `gemini-2.5-flash` |
 | `OLLAMA_URL` | Ollama-Adresse, Standard `http://127.0.0.1:11434` |
 | `OLLAMA_EMBED_MODELL` | Suchmodell, Standard `qwen3-embedding:0.6b` |
-| `KI_TEMPOLIMIT` | `aus` bei bezahltem Gemini-Zugang (schnellere Texterkennung) |
+| `TEXTERKENNUNG` | `lokal` (Standard) oder `gemini` |
+| `OLLAMA_OCR_MODELL` | Modell für die Texterkennung, Standard `qwen3-vl:4b` |
+| `KI_TEMPOLIMIT` | `aus` bei bezahltem Gemini-Zugang (nur für `TEXTERKENNUNG=gemini`) |
 | `AUTO_UPDATE` | `aus`, um automatische Updates abzuschalten |
 
 ## Hinweis

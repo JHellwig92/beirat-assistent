@@ -19,6 +19,10 @@ GEMINI_MODELL = os.getenv("GEMINI_MODELL", "gemini-2.5-flash")
 # Suchmodell lokal über Ollama (kein Tageslimit, nichts geht dafür an Google).
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 OLLAMA_EMBED_MODELL = os.getenv("OLLAMA_EMBED_MODELL", "qwen3-embedding:0.6b")
+# Texterkennung eingescannter Seiten: "lokal" (Ollama, kein Limit, nichts geht an
+# Google; Gemini nur als Ersatz, falls Ollama fehlt) oder "gemini".
+TEXTERKENNUNG = "gemini" if os.getenv("TEXTERKENNUNG", "lokal").strip().lower() == "gemini" else "lokal"
+OLLAMA_OCR_MODELL = os.getenv("OLLAMA_OCR_MODELL", "qwen3-vl:4b")
 
 # Tempo der Texterkennung — knapp unter dem Minutenlimit der kostenlosen
 # Gemini-Stufe. Mit bezahltem Zugang in der .env KI_TEMPOLIMIT=aus setzen.
@@ -47,7 +51,8 @@ MAX_PRO_DATEI = 3            # höchstens so viele davon aus derselben Datei
 SUCH_KANDIDATEN = 40         # Vorauswahl je Suchverfahren vor dem Zusammenführen
 GESPRAECH_ERGEBNISSE = 6     # zusätzliche Textstellen aus den Quellen nur für dieses Gespräch
 MAX_VERGLEICH_ZEICHEN = 300_000   # je Dokument beim Dokumentenvergleich (~75.000 Wörter)
-OCR_SEITEN_PRO_ANFRAGE = 8   # Scan-Seiten, die gemeinsam an Gemini gehen
+OCR_SEITEN_PRO_ANFRAGE = 8   # Scan-Seiten, die gemeinsam an Gemini gehen (nur Ersatzweg)
+OCR_DPI = 150                # Auflösung der Seitenbilder für die lokale Texterkennung
 MAX_WEB_ERGEBNISSE = 4
 
 DATEN_ORDNER.mkdir(exist_ok=True)
