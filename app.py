@@ -367,21 +367,24 @@ SCAN_HINWEIS = (
 
 @st.fragment(run_every=15)
 def hintergrund_anzeige():
-    """Fortschritt von Stufe 2 (Scans + Suchindex) — aktualisiert sich alle 15 s selbst."""
+    """Fortschritt von Stufe 2 (Scans + Suchindex) — aktualisiert sich alle 15 s selbst.
+    Bewusst immer genau EIN Element mit wechselndem Text: Wenn bei der automatischen
+    Aktualisierung Elemente hinzukommen oder wegfallen, gerät der Browser manchmal
+    durcheinander ("NotFoundError … removeChild")."""
     f = pdf_indexer.fortschritt_stufe2()
+    zeilen = []
     if f["abschnitte"] and f["mit_vektor"] < f["abschnitte"]:
-        st.progress(
-            f["mit_vektor"] / f["abschnitte"],
-            text=f"🔎 Suchindex: {f['mit_vektor']} von {f['abschnitte']} Abschnitten",
-        )
-        st.caption("Bis er fertig ist, findet der Assistent Unterlagen über Stichworte — "
-                   "fragen geht also schon.")
+        prozent = int(100 * f["mit_vektor"] / f["abschnitte"])
+        zeilen.append(f"🔎 **Suchindex:** {f['mit_vektor']} von {f['abschnitte']} Abschnitten ({prozent} %)  \n"
+                      "Bis er fertig ist, findet der Assistent Unterlagen über Stichworte — "
+                      "fragen geht also schon.")
     if f["scans_offen"]:
-        st.caption(f"📄 {f['scans_offen']} eingescannte Datei(en) warten noch auf die Texterkennung.")
+        zeilen.append(f"📄 {f['scans_offen']} eingescannte Datei(en) warten noch auf die Texterkennung.")
     if f["laeuft"] and f["aufgabe"]:
-        st.caption(f"⏳ {f['aufgabe']}")
+        zeilen.append(f"⏳ {f['aufgabe']}")
     if f["hinweis"]:
-        st.info(f["hinweis"])
+        zeilen.append(f"ℹ️ {f['hinweis']}")
+    st.caption("\n\n".join(zeilen) if zeilen else "\u200b")
 
 
 def fortschritts_box(titel: str, hinweis: str = ""):
