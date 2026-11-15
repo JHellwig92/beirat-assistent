@@ -20,7 +20,43 @@ import vergleich
 import websuche
 from gemini_ki import frage_ki
 
-st.set_page_config(page_title="Beirat-Assistent", page_icon="🏠", layout="centered")
+st.set_page_config(page_title="Beirat-Assistent", page_icon=":material/apartment:", layout="centered")
+
+st.markdown("""
+<style>
+  /* Ruhiges, sachliches Erscheinungsbild (ohne Streamlit-Menü und -Fußzeile) */
+  /* Menü und Fußzeile weg — die Werkzeugleiste selbst bleibt, darin sitzt der
+     Knopf zum Wieder-Ausklappen der Seitenleiste */
+  #MainMenu, footer, [data-testid="stMainMenu"], [data-testid="stToolbarActions"],
+  [data-testid="stAppDeployButton"], [data-testid="stDecoration"] { display: none !important; }
+  header[data-testid="stHeader"] { background: transparent; }
+  .block-container { padding-top: 2.2rem; max-width: 820px; }
+  [data-testid="stSidebar"] { border-right: 1px solid #ececf1; }
+  [data-testid="stSidebar"] [data-testid="stCaptionContainer"] { letter-spacing: .02em; }
+  [data-testid="stSidebar"] button[kind="tertiary"], [data-testid="stSidebar"] button[kind="secondary"] {
+      justify-content: flex-start; text-align: left; }
+  [data-testid="stSidebar"] button[kind="tertiary"] > div, [data-testid="stSidebar"] button[kind="secondary"] > div {
+      justify-content: flex-start; width: 100%; }
+  [data-testid="stBottomBlockContainer"] { max-width: 820px; padding-bottom: 1.2rem; }
+  [data-testid="stChatInput"] textarea { font-size: 1.05rem; }
+  [data-testid="stPopover"] button, [data-testid="stBottomBlockContainer"] .stButton button {
+      border-radius: 999px; font-size: .92rem; padding: .25rem .85rem; min-height: 2.1rem; }
+  /* Chat wie bei ChatGPT/Claude: eigene Fragen als Blase rechts, keine bunten Symbole */
+  [data-testid="stChatMessageAvatarUser"], [data-testid="stChatMessageAvatarAssistant"] { display: none; }
+  [data-testid="stChatMessage"] { background: transparent; padding: .25rem 0; gap: 0; }
+  [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+      background: #f4f4f5; border-radius: 18px; padding: .55rem 1.1rem; width: fit-content;
+      max-width: 85%; margin-left: auto; }
+  /* Quellen als kompakte Zeile */
+  [class*="st-key-quellen_"] button { font-size: .85rem; padding: .1rem .55rem; min-height: 1.8rem;
+      border: 1px solid #e4e4e7; border-radius: 8px; }
+  /* Frühere Gespräche: "…" nur beim Darüberfahren */
+  [data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:not(:hover) [data-testid="stPopover"] { opacity: 0; }
+  [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] { gap: .25rem; }
+  [data-testid="stSidebar"] [data-testid="stPopoverButton"] > div > div[aria-hidden="true"] { display: none; }
+  [data-testid="stSidebar"] [data-testid="stPopoverButton"] { border: 0; background: transparent; }
+</style>
+""", unsafe_allow_html=True)
 
 SYSTEM_PROMPT = """Du bist der persönliche Assistent eines Verwaltungsbeirats einer
 Wohnungseigentümergemeinschaft (WEG) in Deutschland.
@@ -58,7 +94,7 @@ style="text-align:center;background-color:#fce4ec;". Kein <script>, <img>, <ifra
 <html>/<head>/<body>-Gerüst — nur der Inhalt selbst. Antworte auf Deutsch."""
 
 PDF_FORMAT_OPTIONEN = {
-    "Unverändert": None,
+    "Wie im Chat": None,
     "Als Beschlussvorlage": (
         "Formatiere den Inhalt als Beschlussvorlage für eine Eigentümerversammlung: "
         "Überschrift 'Beschlussvorlage', darunter 'Sachverhalt', 'Beschlussvorschlag' "
@@ -237,8 +273,8 @@ def baue_gespraechskontext() -> str:
     return "\n".join(teile) + "\n\n"
 
 
-def beantworte_frage(frage: str, web_modus: str):
-    doks = suche.suche_dokumente(frage, st.session_state.gespraechs_id)
+def beantworte_frage(frage: str, web_modus: str, nur_pfade: list[str] | None):
+    doks = suche.suche_dokumente(frage, st.session_state.gespraechs_id, nur_pfade or None)
     webs = []
     if web_modus == "Immer":
         webs = websuche.suche_web(frage)
@@ -285,25 +321,28 @@ def zeige_quellen(doks: list[dict], webs: list[dict], antwort: str, key_prefix: 
     if not gezeigt_doks and not gezeigt_webs:
         return
 
-    st.markdown("**Quellen:**")
+    st.caption("Quellen")
     schon_gezeigt = set()
-    for i, d in gezeigt_doks:
-        merkmal = (d["datei"], d.get("seite", 0))
-        if merkmal in schon_gezeigt:
-            continue
-        schon_gezeigt.add(merkmal)
-        ort = f" – Seite {d['seite']}" if d.get("seite") else ""
-        if d.get("pfad"):
-            if st.button(f"📄 [D{i}] {d['datei']}{ort}", key=f"{key_prefix}_d{i}"):
-                try:
-                    os.startfile(d["pfad"])
-                except Exception:
-                    st.warning(f"Datei konnte nicht geöffnet werden: {d['pfad']}")
-        else:
-            st.markdown(f"📄 [D{i}] {d['datei']}{ort}")
-    for i, w in gezeigt_webs:
-        if w.get("url"):
-            st.markdown(f"🔗 [W{i}] [{w['titel'] or w['url']}]({w['url']})")
+    with st.container(horizontal=True, gap="small", key=f"quellen_{key_prefix}"):
+        for i, d in gezeigt_doks:
+            merkmal = (d["datei"], d.get("seite", 0))
+            if merkmal in schon_gezeigt:
+                continue
+            schon_gezeigt.add(merkmal)
+            ort = f" · S. {d['seite']}" if d.get("seite") else ""
+            if d.get("pfad"):
+                if st.button(f"[D{i}] {d['datei']}{ort}", key=f"{key_prefix}_d{i}",
+                             icon=":material/description:", type="tertiary", help="Dokument öffnen"):
+                    try:
+                        os.startfile(d["pfad"])
+                    except Exception:
+                        st.warning(f"Datei konnte nicht geöffnet werden: {d['pfad']}")
+            else:
+                st.markdown(f":material/description: [D{i}] {d['datei']}{ort}")
+        for i, w in gezeigt_webs:
+            if w.get("url"):
+                st.link_button(f"[W{i}] {(w['titel'] or w['url'])[:60]}", w["url"],
+                               icon=":material/link:", type="tertiary")
 
 
 # ── PDF-Export ────────────────────────────────────────────────────────────────
@@ -318,43 +357,6 @@ def gestalte_fuer_pdf(frage: str, antwort: str, anweisung: str) -> str:
     )
     html = frage_ki(prompt, system=PDF_FORMAT_ANWEISUNG)
     return re.sub(r"^```(?:html)?|```$", "", html.strip(), flags=re.MULTILINE).strip()
-
-
-def pdf_export_ui(
-    frage: str, antwort: str, key_prefix: str,
-    doks: list[dict] | None = None, webs: list[dict] | None = None,
-):
-    state_key = f"{key_prefix}_pdf"
-    with st.expander("📄 Als PDF speichern"):
-        format_wahl = st.selectbox(
-            "Formatierung", list(PDF_FORMAT_OPTIONEN.keys()), key=f"{state_key}_wahl"
-        )
-        eigene_anweisung = ""
-        if format_wahl == "Eigene Anweisung":
-            eigene_anweisung = st.text_input(
-                "Wie soll die KI den Inhalt formatieren?",
-                key=f"{state_key}_eigen",
-                placeholder="z. B. als Flyer in Pink, als Tabelle, als Protokollauszug …",
-            )
-        if st.button("PDF erstellen", key=f"{state_key}_btn"):
-            anweisung = PDF_FORMAT_OPTIONEN[format_wahl] or eigene_anweisung
-            with st.spinner("PDF wird erstellt …"):
-                try:
-                    koerper_html = (
-                        gestalte_fuer_pdf(frage, antwort, anweisung)
-                        if anweisung else pdf_export.markdown_zu_html(antwort)
-                    )
-                    st.session_state[state_key] = pdf_export.erzeuge_pdf_antwort(
-                        frage, koerper_html, doks=doks, webs=webs
-                    )
-                except Exception as e:
-                    st.error(f"PDF-Erstellung fehlgeschlagen: {str(e)[:150]}")
-        if st.session_state.get(state_key):
-            dateiname = f"Beirat-Antwort_{datetime.now().strftime('%Y-%m-%d_%H%M')}.pdf"
-            st.download_button(
-                "💾 PDF speichern unter …", st.session_state[state_key],
-                file_name=dateiname, mime="application/pdf", key=f"{state_key}_dl",
-            )
 
 
 # ── Unterlagen einlesen & Ordner ──────────────────────────────────────────────
@@ -375,15 +377,15 @@ def hintergrund_anzeige():
     zeilen = []
     if f["abschnitte"] and f["mit_vektor"] < f["abschnitte"]:
         prozent = int(100 * f["mit_vektor"] / f["abschnitte"])
-        zeilen.append(f"🔎 **Suchindex:** {f['mit_vektor']} von {f['abschnitte']} Abschnitten ({prozent} %)  \n"
+        zeilen.append(f":material/manage_search: **Suchindex:** {f['mit_vektor']} von {f['abschnitte']} Abschnitten ({prozent} %)  \n"
                       "Bis er fertig ist, findet der Assistent Unterlagen über Stichworte — "
                       "fragen geht also schon.")
     if f["scans_offen"]:
-        zeilen.append(f"📄 {f['scans_offen']} eingescannte Datei(en) warten noch auf die Texterkennung.")
+        zeilen.append(f":material/document_scanner: {f['scans_offen']} eingescannte Datei(en) warten noch auf die Texterkennung.")
     if f["laeuft"] and f["aufgabe"]:
-        zeilen.append(f"⏳ {f['aufgabe']}")
+        zeilen.append(f":material/hourglass_top: {f['aufgabe']}")
     if f["hinweis"]:
-        zeilen.append(f"ℹ️ {f['hinweis']}")
+        zeilen.append(f":material/info: {f['hinweis']}")
     st.caption("\n\n".join(zeilen) if zeilen else "\u200b")
 
 
@@ -410,9 +412,9 @@ def fortschritts_box(titel: str, hinweis: str = ""):
 def indexiere_mit_anzeige(nur_ordner: str | None = None) -> dict:
     """Prüft/liest die Unterlagen ein und zeigt dabei einen Fortschrittsbalken."""
     if nur_ordner:
-        titel = f"📂 **Neuer Ordner „{Path(nur_ordner).name}“ wird eingelesen …**"
+        titel = f":material/folder_open: **Neuer Ordner „{Path(nur_ordner).name}“ wird eingelesen …**"
     else:
-        titel = "📂 **Unterlagen werden auf Änderungen geprüft …**"
+        titel = ":material/folder_open: **Unterlagen werden auf Änderungen geprüft …**"
     hinweis = ""
     if not pdf_indexer.anzahl_eingelesen() or nur_ordner:
         hinweis = ("Die Dateien werden gelesen — das geht meist in ein bis zwei Minuten. "
@@ -427,127 +429,176 @@ def indexiere_mit_anzeige(nur_ordner: str | None = None) -> dict:
     return status
 
 
-# ── Quellen nur für dieses Gespräch ───────────────────────────────────────────
+# ── Einstellung Internetsuche (bleibt über Neustarts erhalten) ──────────────────────────
 
-def gespraechs_quellen_einlesen(pfade: list[str]):
-    """Liest Dateien/Ordner für das aktuelle Gespräch ein (mit Fortschrittsanzeige)."""
+WEB_OPTIONEN = {
+    "Automatisch": "Nur wenn die Unterlagen nicht ausreichen",
+    "Immer": "Zusätzlich zu den Unterlagen, z. B. für Gesetze und Urteile",
+    "Nie": "Nur die eigenen Unterlagen",
+}
+
+
+def lade_einstellungen() -> dict:
+    werte = {"web_modus": "Automatisch"}
+    try:
+        werte.update(json.loads(config.EINSTELLUNGEN_PFAD.read_text(encoding="utf-8")))
+    except Exception:
+        pass
+    if werte["web_modus"] not in WEB_OPTIONEN:
+        werte["web_modus"] = "Automatisch"
+    return werte
+
+
+def speichere_einstellungen():
+    werte = {k: st.session_state[k] for k in ("web_modus",) if k in st.session_state}
+    try:
+        config.EINSTELLUNGEN_PFAD.write_text(json.dumps(werte), encoding="utf-8")
+    except Exception:
+        pass
+
+
+# ── Gespräche wechseln ────────────────────────────────────────────────────────
+
+def wechsle_gespraech(gespraechs_id: str | None = None, chat: list | None = None):
+    """Neues Gespräch (ohne Argumente) oder ein früheres fortsetzen."""
+    st.session_state.chat = chat or []
+    st.session_state.gespraechs_id = gespraechs_id or str(uuid.uuid4())
+    st.session_state.nur_pfade = []
+    for schluessel in ("zusammenfassung", "gespraech_pdf"):
+        st.session_state.pop(schluessel, None)
+
+
+def oeffne_dialog(name: str):
+    st.session_state.dialog = name
+
+
+# ── Gespräch zu bestimmten Dokumenten ─────────────────────────────────────────
+
+def lies_fuer_gespraech(pfade: list[str], meldung=None) -> tuple[list[str], list[str]]:
+    """Liest Dateien/Ordner vom Computer für das aktuelle Gespräch ein.
+    Gibt (nutzbare Dateipfade, Hinweise) zurück."""
     gid = st.session_state.gespraechs_id
-    platz, fortschritt, meldung = fortschritts_box(
-        "📎 **Quellen für dieses Gespräch werden eingelesen …**", SCAN_HINWEIS
-    )
-    ok, ohne_text, fehler, wartet = [], [], [], []
+    hinweise = []
     for pfad in pfade:
         try:
-            erg = pdf_indexer.fuege_gespraechs_quelle_hinzu(gid, pfad, fortschritt, meldung)
+            erg = pdf_indexer.fuege_gespraechs_quelle_hinzu(gid, pfad, meldung=meldung)
         except Exception as e:
-            fehler.append(f"{Path(pfad).name} ({str(e)[:80]})")
+            hinweise.append(f"{Path(pfad).name} konnte nicht eingelesen werden ({str(e)[:80]}).")
             continue
-        ok += erg["ok"]
-        ohne_text += erg["ohne_text"]
-        fehler += erg["fehler"]
-        wartet += erg["scan_wartet"]
-    platz.empty()
-    meldungen = []
-    if ok:
-        meldungen.append(("success", f"Für dieses Gespräch bereit: {', '.join(ok)}"))
-    if ohne_text:
-        meldungen.append(("warning", f"Kein lesbarer Text gefunden in: {', '.join(ohne_text)}"))
-    if wartet:
-        meldungen.append(("info", f"Diese Scans konnten gerade nicht gelesen werden (lokale KI nicht "
-                                  f"erreichbar) — das wird automatisch nachgeholt: {', '.join(wartet)}"))
-    if fehler:
-        meldungen.append(("error", f"Konnte nicht eingelesen werden: {', '.join(fehler)} — "
-                                   "bitte später noch einmal versuchen."))
-    if not (ok or ohne_text or fehler or wartet):
-        meldungen.append(("warning", "In der Auswahl waren keine PDF-, Word- oder Textdateien."))
-    st.session_state.quellen_meldungen = meldungen
-
-
-def gespraechs_quellen_ui():
-    st.subheader("📎 Nur für dieses Gespräch")
-    st.caption("Dateien oder Ordner, die nur in diesem Gespräch durchsucht werden — "
-               "z. B. Unterlagen für eine einzelne Sitzung.")
-    gid = st.session_state.gespraechs_id
-    for art, text in st.session_state.pop("quellen_meldungen", []):
-        getattr(st, art)(text)
-
+        if erg["ohne_text"]:
+            hinweise.append(f"Kein lesbarer Text in: {', '.join(erg['ohne_text'])}")
+        if erg["fehler"]:
+            hinweise.append(f"Nicht einlesbar: {', '.join(erg['fehler'])}")
+        if erg["scan_wartet"]:
+            hinweise.append(f"Wird noch gelesen (Scan): {', '.join(erg['scan_wartet'])}")
+    gelesen = []
+    ziele = {pdf_indexer._norm(p) for p in pfade}
     for q in pdf_indexer.gespraechs_quellen(gid):
-        symbol = "📁" if q["typ"] == "ordner" else "📄"
-        zusatz = f" ({len(q['dateien'])} Dateien)" if q["typ"] == "ordner" else ""
-        spalte_name, spalte_weg = st.columns([5, 1])
-        spalte_name.markdown(f"{symbol} {q['name']}{zusatz}")
-        schluessel = hashlib.md5(q["pfad"].encode()).hexdigest()[:10]
-        if spalte_weg.button("✖", key=f"gq_weg_{schluessel}", help="Aus diesem Gespräch entfernen"):
-            pdf_indexer.entferne_gespraechs_quelle(gid, q["pfad"])
-            st.rerun()
+        if pdf_indexer._norm(q["pfad"]) in ziele:
+            gelesen += q["dateien"]
+    return gelesen, hinweise
+
+
+@st.dialog("Gespräch zu bestimmten Dokumenten", width="large")
+def dokument_dialog():
+    gid = st.session_state.gespraechs_id
+    st.caption("Wählen Sie die Dokumente, um die es in diesem Gespräch gehen soll. "
+               "Ich antworte dann nur aus diesen Dokumenten.")
+    auswahl = pdf_indexer.alle_dokumente(gid)
+    namen = {d["pfad"]: f"{d['name']}  ·  {d['herkunft']}" for d in auswahl}
+    vorher = [p for p in st.session_state.get("nur_pfade", []) if p in namen]
+    gewaehlt = st.multiselect(
+        "Dokumente", list(namen), default=vorher, format_func=lambda p: namen.get(p, Path(p).name),
+        placeholder="Hier klicken und Namen tippen, z. B. „Verwaltervertrag“ …", select_all=False,
+    )
 
     zaehler = st.session_state.setdefault("upload_zaehler", 0)
-    hochgeladen = st.file_uploader(
-        "Dateien hinzufügen", type=["pdf", "docx", "txt"], accept_multiple_files=True,
-        key=f"gq_upload_{zaehler}", label_visibility="collapsed",
-    )
-    if hochgeladen and st.button("📎 Diese Dateien verwenden", type="primary"):
-        st.session_state.neue_gespraechs_quellen = [
-            str(pdf_indexer.speichere_upload(gid, d.name, d.getvalue())) for d in hochgeladen
-        ]
-        st.session_state.upload_zaehler = zaehler + 1   # Auswahlfeld leeren
-        st.rerun()
+    with st.expander("Datei vom Computer hinzufügen (z. B. von einem Stick)", icon=":material/upload_file:"):
+        hochgeladen = st.file_uploader(
+            "Dateien", type=["pdf", "docx", "txt"], accept_multiple_files=True,
+            key=f"gq_upload_{zaehler}", label_visibility="collapsed",
+        )
+        ordner_knopf = st.button("Ganzen Ordner wählen …", icon=":material/folder:")
 
-    if st.button("📁 Ordner für dieses Gespräch wählen"):
+    neue_pfade = []
+    if ordner_knopf:
         with st.spinner("Bitte im aufgehenden Fenster einen Ordner auswählen …"):
             pfad = waehle_ordner_dialog()
         if pfad is None:
-            st.warning("Das Auswahlfenster ließ sich nicht öffnen. Bitte die Dateien "
-                       "stattdessen oben per „Browse files“ hochladen.")
+            st.warning("Das Auswahlfenster ließ sich nicht öffnen. Bitte die Dateien oben hochladen.")
         elif pfad:
-            st.session_state.neue_gespraechs_quellen = [pfad]
-            st.rerun()
+            neue_pfade.append(pfad)
+
+    links, rechts = st.columns(2)
+    alle = links.button("Doch alle Unterlagen verwenden", use_container_width=True)
+    uebernehmen = rechts.button("Übernehmen", type="primary", use_container_width=True,
+                                disabled=not (gewaehlt or hochgeladen or neue_pfade))
+    if alle:
+        st.session_state.nur_pfade = []
+        st.rerun()
+    if not (uebernehmen or neue_pfade):
+        return
+
+    if hochgeladen:
+        neue_pfade += [str(pdf_indexer.speichere_upload(gid, d.name, d.getvalue())) for d in hochgeladen]
+        st.session_state.upload_zaehler = zaehler + 1
+    hinweise = []
+    if neue_pfade:
+        detail = st.empty()
+        with st.spinner("Dateien werden eingelesen …"):
+            dazu, hinweise = lies_fuer_gespraech(neue_pfade, meldung=detail.caption)
+        gewaehlt = list(dict.fromkeys(gewaehlt + dazu))
+    st.session_state.nur_pfade = gewaehlt
+    st.session_state.auswahl_hinweise = hinweise
+    st.rerun()
 
 
 # ── Dokumentenvergleich ───────────────────────────────────────────────────────
 
 def _dokument_wahl(spalte, buchstabe: str, auswahl: list[dict]) -> str | None:
-    """Ein Dokument aus den Unterlagen wählen oder hochladen. Gibt den Pfad zurück."""
+    """Ein Dokument aus den Unterlagen wählen oder vom Computer hochladen.
+    Gibt den Pfad zurück (bzw. "upload:<Buchstabe>")."""
     with spalte:
-        st.markdown(f"**Dokument {buchstabe}**")
-        hochgeladen = st.file_uploader(
-            "Hochladen", type=["pdf", "docx", "txt"], key=f"vgl_upload_{buchstabe}",
-            label_visibility="collapsed",
-        )
-        if hochgeladen:
-            st.caption("Hochgeladene Datei wird verwendet.")
-            return f"upload:{buchstabe}"
         index = st.selectbox(
-            "… oder aus den Unterlagen", range(len(auswahl)), index=None,
+            f"Dokument {buchstabe}", range(len(auswahl)), index=None,
             format_func=lambda i: f"{auswahl[i]['name']}  ·  {auswahl[i]['herkunft']}",
-            placeholder="Dokument suchen …", key=f"vgl_wahl_{buchstabe}",
+            placeholder="Namen tippen oder auswählen …", key=f"vgl_wahl_{buchstabe}",
         )
+        with st.popover("Vom Computer", icon=":material/upload_file:", type="tertiary"):
+            hochgeladen = st.file_uploader(
+                "Datei hochladen", type=["pdf", "docx", "txt"], key=f"vgl_upload_{buchstabe}",
+            )
+        if hochgeladen:
+            st.caption(f"Verwendet: {hochgeladen.name}")
+            return f"upload:{buchstabe}"
         return auswahl[index]["pfad"] if index is not None else None
 
 
-@st.dialog("⚖️ Dokumente vergleichen", width="large")
+@st.dialog("Dokumente vergleichen", width="large")
 def vergleich_dialog():
     gid = st.session_state.gespraechs_id
     auswahl = pdf_indexer.alle_dokumente(gid)
-    st.caption("Zwei Dokumente wählen — aus den Unterlagen oder per Hochladen. "
-               "Die KI liest beide vollständig und stellt sie gegenüber.")
-    spalte_a, spalte_b = st.columns(2)
-    wahl_a = _dokument_wahl(spalte_a, "A", auswahl)
-    wahl_b = _dokument_wahl(spalte_b, "B", auswahl)
+    st.caption("Die KI liest die Dokumente vollständig und stellt sie gegenüber – "
+               "z. B. Protokolle mehrerer Jahre oder mehrere Angebote.")
+    anzahl = st.segmented_control("Wie viele Dokumente möchten Sie vergleichen?",
+                                  [2, 3, 4, 5], default=2, key="vgl_anzahl") or 2
+    buchstaben = vergleich.BUCHSTABEN[:anzahl]
+    spalten = st.columns(2)
+    wahlen = [_dokument_wahl(spalten[i % 2], b, auswahl) for i, b in enumerate(buchstaben)]
     schwerpunkt = st.text_input(
         "Worauf soll besonders geachtet werden? (freiwillig)",
         placeholder="z. B. Kosten und Fristen, Änderungen bei der Tiefgarage …",
     )
-    if not st.button("Vergleichen", type="primary", disabled=not (wahl_a and wahl_b)):
+    if not st.button("Vergleichen", type="primary", disabled=not all(wahlen)):
         return
-    if wahl_a == wahl_b:
-        st.warning("Bitte zwei verschiedene Dokumente wählen.")
+    if len(set(wahlen)) < len(wahlen):
+        st.warning("Bitte jedes Dokument nur einmal wählen.")
         return
 
     # Hochgeladene Dateien beim Gespräch ablegen und als Gesprächsquelle einlesen,
     # damit Rückfragen zum Vergleich auch darin suchen können.
     pfade = []
-    for wahl, buchstabe in ((wahl_a, "A"), (wahl_b, "B")):
+    for wahl, buchstabe in zip(wahlen, buchstaben):
         if wahl.startswith("upload:"):
             datei = st.session_state[f"vgl_upload_{buchstabe}"]
             pfad = str(pdf_indexer.speichere_upload(gid, datei.name, datei.getvalue()))
@@ -560,14 +611,14 @@ def vergleich_dialog():
             pfade.append(wahl)
 
     detail = st.empty()
-    with st.spinner("Dokumente werden gelesen und verglichen — das kann eine Minute dauern …"):
+    with st.spinner("Dokumente werden gelesen und verglichen – das kann eine Minute dauern …"):
         try:
-            antwort = vergleich.vergleiche(pfade[0], pfade[1], schwerpunkt, meldung=detail.caption)
+            antwort = vergleich.vergleiche(pfade, schwerpunkt, meldung=detail.caption)
         except Exception as e:
             st.error(fehlertext_ki(e, "Der Vergleich ist fehlgeschlagen"))
             return
 
-    frage = f"⚖️ Vergleich: {Path(pfade[0]).name} ↔ {Path(pfade[1]).name}"
+    frage = "Vergleich: " + " · ".join(Path(p).name for p in pfade)
     if schwerpunkt.strip():
         frage += f" (Schwerpunkt: {schwerpunkt.strip()})"
     doks = [{"datei": Path(p).name, "pfad": p, "seite": 0} for p in pfade]
@@ -616,7 +667,6 @@ def ordner_hinzufuegen(pfad: str):
 
 
 def ordner_ui():
-    st.subheader("📁 Unterlagen-Ordner")
     st.caption("Häkchen = wird bei Fragen durchsucht. Umschalten wirkt sofort.")
     zaehler = pdf_indexer.dateien_pro_ordner()
     ordner = pdf_indexer.lade_ordner()
@@ -629,11 +679,11 @@ def ordner_ui():
         )
         info = f"{zaehler.get(pdf_indexer._norm(o['pfad']), 0)} Datei(en)"
         if not o["erreichbar"]:
-            info += " · ⚠️ gerade nicht erreichbar (z. B. Stick abgezogen) — bereits Eingelesenes bleibt nutzbar"
+            info += " · :material/warning: gerade nicht erreichbar (z. B. Stick abgezogen) — bereits Eingelesenes bleibt nutzbar"
         st.caption(info)
         if aktiv != o["aktiv"]:
             pdf_indexer.setze_ordner_aktiv(o["pfad"], aktiv)
-            st.rerun()
+            st.rerun(scope="fragment")
 
         if not o["haupt"]:
             frage_key = f"ordner_weg_{schluessel}"
@@ -643,18 +693,18 @@ def ordner_ui():
                 if ja.button("Ja, entfernen", key=f"{frage_key}_ja"):
                     pdf_indexer.entferne_ordner(o["pfad"])
                     st.session_state.pop(frage_key, None)
-                    st.rerun()
+                    st.rerun(scope="fragment")
                 if nein.button("Abbrechen", key=f"{frage_key}_nein"):
                     st.session_state.pop(frage_key, None)
-                    st.rerun()
-            elif st.button("🗑️ Aus Liste entfernen", key=f"{frage_key}_btn"):
+                    st.rerun(scope="fragment")
+            elif st.button("Aus Liste entfernen", key=f"{frage_key}_btn", icon=":material/delete:", type="tertiary"):
                 st.session_state[frage_key] = True
-                st.rerun()
+                st.rerun(scope="fragment")
 
     if ordner and not any(o["aktiv"] for o in ordner):
         st.warning("Kein Ordner eingeschaltet — der Assistent durchsucht gerade keine Unterlagen.")
 
-    if st.button("➕ Ordner hinzufügen"):
+    if st.button("Ordner hinzufügen", icon=":material/create_new_folder:"):
         with st.spinner("Bitte im aufgehenden Fenster einen Ordner auswählen …"):
             pfad = waehle_ordner_dialog()
         if pfad is None:
@@ -667,46 +717,222 @@ def ordner_ui():
         if st.button("Hinzufügen", disabled=not eingabe):
             ordner_hinzufuegen(eingabe)
 
-    if st.button("🔄 Unterlagen jetzt neu prüfen", help="Nach dem Hinzufügen oder Ändern von Dateien während der Assistent läuft."):
+    if st.button("Unterlagen jetzt neu prüfen", icon=":material/refresh:", help="Nach dem Hinzufügen oder Ändern von Dateien während der Assistent läuft."):
         st.session_state.pop("index_status", None)
         st.rerun()
 
 
 # ── E-Mail-Zusammenfassung ────────────────────────────────────────────────────
 
-def erzeuge_zusammenfassung() -> str:
-    nachrichten = st.session_state.chat
-    if not nachrichten:
-        return ""
-    gespraech = "\n\n".join(
+def gespraech_als_text() -> str:
+    return "\n\n".join(
         f"{'Frage' if n['rolle'] == 'user' else 'Antwort'}: {n['text']}"
-        for n in nachrichten
+        for n in st.session_state.chat
     )
+
+
+def erzeuge_zusammenfassung() -> str:
+    if not st.session_state.chat:
+        return ""
     return frage_ki(
         "Fasse das folgende Gespräch eines WEG-Beirats mit seinem KI-Assistenten "
         "sachlich zusammen: die gestellten Fragen, die wichtigsten Antworten und "
         "genannten Quellen. Verständlich und kompakt, als Text für eine E-Mail "
-        "an Miteigentümer. Keine Anrede, kein Gruß.\n\n" + gespraech
+        "an Miteigentümer. Keine Anrede, kein Gruß.\n\n" + gespraech_als_text()
     )
+
+
+@st.dialog("Gespräch als E-Mail")
+def email_dialog():
+    stand = (st.session_state.gespraechs_id, len(st.session_state.chat))
+    gespeichert = st.session_state.get("zusammenfassung")
+    if not gespeichert or gespeichert[0] != stand:
+        with st.spinner("Zusammenfassung wird erstellt …"):
+            try:
+                st.session_state.zusammenfassung = (stand, erzeuge_zusammenfassung())
+            except Exception as e:
+                st.error(fehlertext_ki(e, "Zusammenfassung fehlgeschlagen"))
+                return
+    zsf = st.session_state.zusammenfassung[1]
+    st.caption("Sie können den Text hier noch ändern, bevor Sie ihn verschicken.")
+    zsf = st.text_area("Zusammenfassung", zsf, height=280, label_visibility="collapsed")
+    betreff = f"Beirat-Gespräch vom {datetime.now().strftime('%d.%m.%Y')}"
+    mailto = ("mailto:?subject=" + urllib.parse.quote(betreff)
+              + "&body=" + urllib.parse.quote(zsf[:1500]))
+    links, rechts = st.columns(2)
+    links.link_button("Im E-Mail-Programm öffnen", mailto, icon=":material/mail:", type="primary", use_container_width=True)
+    rechts.download_button("Als Textdatei speichern", zsf, icon=":material/download:", file_name=f"{betreff}.txt",
+                           use_container_width=True)
+    if len(zsf) > 1500:
+        st.caption("Hinweis: Ins E-Mail-Programm passen nur die ersten 1.500 Zeichen — "
+                   "für den ganzen Text bitte die Textdatei nehmen.")
+
+
+# ── Gespräch als PDF ──────────────────────────────────────────────────────────
+
+PDF_ERKLAERUNG = {
+    "Wie im Chat": "Fragen, Antworten und Quellen – so wie hier zu sehen",
+    "Als Beschlussvorlage": "Sachverhalt, Beschlussvorschlag, Platz für das Abstimmungsergebnis",
+    "Als Liste / Stichpunkte": "Kurz und übersichtlich",
+    "Als Brief an Miteigentümer": "Mit Anrede und Grußformel",
+    "Eigene Anweisung": "Sie beschreiben selbst, wie es aussehen soll",
+}
+
+
+@st.dialog("Gespräch als PDF")
+def pdf_dialog():
+    wahl = st.radio("Wie soll das PDF aussehen?", list(PDF_FORMAT_OPTIONEN),
+                    captions=[PDF_ERKLAERUNG.get(k, "") for k in PDF_FORMAT_OPTIONEN])
+    eigene = ""
+    if wahl == "Eigene Anweisung":
+        eigene = st.text_input("Wie soll die KI das Gespräch gestalten?",
+                               placeholder="z. B. als Tabelle, als Protokollauszug, als Aushang …")
+    if st.button("PDF erstellen", type="primary", disabled=wahl == "Eigene Anweisung" and not eigene.strip()):
+        anweisung = PDF_FORMAT_OPTIONEN[wahl] or eigene.strip()
+        with st.spinner("PDF wird erstellt …"):
+            try:
+                if anweisung:
+                    doks, webs, gesehen = [], [], set()
+                    for n in st.session_state.chat:
+                        for d in n.get("doks", []):
+                            if (d["datei"], d.get("seite", 0)) not in gesehen:
+                                gesehen.add((d["datei"], d.get("seite", 0)))
+                                doks.append(d)
+                        webs += [w for w in n.get("webs", []) if w not in webs]
+                    html = gestalte_fuer_pdf("Gesamtes Gespräch", gespraech_als_text(), anweisung)
+                    titel = f"Beirat-Gespräch vom {datetime.now().strftime('%d.%m.%Y')}"
+                    st.session_state.gespraech_pdf = pdf_export.erzeuge_pdf_antwort(titel, html, doks, webs)
+                else:
+                    st.session_state.gespraech_pdf = pdf_export.erzeuge_pdf_gespraech(st.session_state.chat)
+            except Exception as e:
+                st.session_state.pop("gespraech_pdf", None)
+                st.error(fehlertext_ki(e, "PDF-Erstellung fehlgeschlagen"))
+    if st.session_state.get("gespraech_pdf"):
+        st.success("PDF ist fertig.")
+        st.download_button(
+            "PDF speichern", st.session_state.gespraech_pdf, icon=":material/download:", type="primary", use_container_width=True,
+            file_name=f"Beirat-Gespraech_{datetime.now().strftime('%Y-%m-%d_%H%M')}.pdf",
+            mime="application/pdf",
+        )
+
+
+@st.dialog("Unterlagen-Ordner", width="large")
+def ordner_dialog():
+    ordner_ui()
+
+
+# ── Seitenleiste ──────────────────────────────────────────────────────────────
+
+def zeit_text(iso: str) -> str:
+    try:
+        t = datetime.fromisoformat(iso)
+    except Exception:
+        return ""
+    tage = (datetime.now().date() - t.date()).days
+    if tage == 0:
+        return f"Heute, {t:%H:%M}"
+    if tage == 1:
+        return f"Gestern, {t:%H:%M}"
+    return f"{t:%d.%m.%Y}"
+
+
+def seitenleiste(status: dict):
+    st.markdown("#### Beirat-Assistent")
+    st.button("Neues Gespräch", icon=":material/edit_square:", type="primary", use_container_width=True,
+              on_click=wechsle_gespraech, disabled=not st.session_state.chat)
+
+    st.caption("FRÜHERE GESPRÄCHE")
+    gruppen = gruppiere_verlauf(lade_verlauf())
+    if not gruppen:
+        st.caption("Noch keine. Ihre Gespräche erscheinen hier automatisch.")
+    for gruppe in gruppen[:20]:
+        aktiv = gruppe["id"] == st.session_state.gespraechs_id
+        erste = gruppe["eintraege"][0]["frage"]
+        titel = erste[:42] + ("…" if len(erste) > 42 else "")
+        anzahl = len(gruppe["eintraege"])
+        spalte_titel, spalte_mehr = st.columns([6, 1], vertical_alignment="center")
+        spalte_titel.button(
+            titel, key=f"gespraech_{gruppe['id']}", use_container_width=True,
+            type="secondary" if aktiv else "tertiary",
+            help=f"{zeit_text(gruppe['letzte_zeit'])} · {anzahl} Frage{'n' if anzahl > 1 else ''}"
+                 + (" · gerade geöffnet" if aktiv else " · Klicken zum Fortsetzen"),
+            on_click=wechsle_gespraech, args=(gruppe["id"], gruppe_zu_chat(gruppe)),
+        )
+        with spalte_mehr.popover("", icon=":material/more_horiz:", help="Weitere Aktionen"):
+            st.caption(f"{zeit_text(gruppe['letzte_zeit'])} · {anzahl} Frage(n)")
+            if st.button("Gespräch endgültig löschen", key=f"loeschen_{gruppe['id']}", icon=":material/delete:"):
+                loesche_gespraech(gruppe["id"])
+                if aktiv:
+                    wechsle_gespraech()
+                st.rerun()
+    if len(gruppen) > 20:
+        st.caption(f"… und {len(gruppen) - 20} ältere Gespräche.")
+
+    st.divider()
+    st.button("Unterlagen-Ordner verwalten", icon=":material/folder_managed:", use_container_width=True,
+              on_click=oeffne_dialog, args=("ordner",))
+    if isinstance(status.get("fehler"), str):
+        st.warning(f"Unterlagen-Prüfung fehlgeschlagen: {status['fehler'][:150]}")
+        return
+    st.caption(f"{pdf_indexer.anzahl_eingelesen()} Dokumente eingelesen")
+    hintergrund_anzeige()
+    if status.get("fehler"):
+        with st.expander(f"{len(status['fehler'])} Datei(en) nicht einlesbar", icon=":material/warning:"):
+            st.caption("Wird beim nächsten Start automatisch erneut versucht.")
+            for name in status["fehler"]:
+                st.markdown(f"- {name}")
+    if status.get("ohne_text"):
+        with st.expander(f"{len(status['ohne_text'])} Datei(en) ohne lesbaren Text", icon=":material/info:"):
+            for name in status["ohne_text"]:
+                st.markdown(f"- {name}")
+    st.caption("Die Antworten ersetzen keine Rechtsberatung.")
+
+
+# ── Knöpfe am Eingabefeld ─────────────────────────────────────────────────────
+
+def eingabe_leiste():
+    nur = st.session_state.get("nur_pfade", [])
+    if nur:
+        etikett = f"Nur {len(nur)} Dokument{'e' if len(nur) > 1 else ''}"
+    else:
+        etikett = "Alle Unterlagen"
+    with st.container(horizontal=True, gap="small"):
+        with st.popover(etikett, icon=":material/library_books:", help="Worin soll ich suchen?"):
+            st.markdown("**Worin soll ich suchen?**")
+            if nur:
+                st.caption("Dieses Gespräch dreht sich nur um:")
+                for p in nur:
+                    st.markdown(f"- {Path(p).name}")
+            else:
+                st.caption("Gerade: in allen eingeschalteten Unterlagen-Ordnern.")
+            st.button("Bestimmte Dokumente wählen …", icon=":material/checklist:", use_container_width=True,
+                      on_click=oeffne_dialog, args=("dokumente",))
+            if nur and st.button("Wieder alle Unterlagen", use_container_width=True):
+                st.session_state.nur_pfade = []
+                st.rerun()
+
+        with st.popover(f"Internet: {st.session_state.web_modus}", icon=":material/language:", help="Im Internet nachsehen?"):
+            st.radio("**Im Internet nachsehen?**", list(WEB_OPTIONEN), key="web_modus",
+                     captions=list(WEB_OPTIONEN.values()), on_change=speichere_einstellungen)
+
+        st.button("Vergleichen", icon=":material/compare:", on_click=oeffne_dialog, args=("vergleich",),
+                  help="Zwei Dokumente gegenüberstellen")
 
 
 # ── Oberfläche ────────────────────────────────────────────────────────────────
 
-st.title("🏠 Beirat-Assistent")
-
 if not config.GEMINI_API_KEY:
+    st.title("Beirat-Assistent")
     st.error(
         "Es fehlt noch der Google-KI-Schlüssel.\n\n"
         "Bitte einmal **einrichten.bat** doppelklicken (im Ordner des Assistenten)."
     )
     st.stop()
 
-
 if "chat" not in st.session_state:
-    st.session_state.chat = []
-
-if "gespraechs_id" not in st.session_state:
-    st.session_state.gespraechs_id = str(uuid.uuid4())
+    wechsle_gespraech()
+if "web_modus" not in st.session_state:
+    st.session_state.update(lade_einstellungen())
 
 if st.session_state.get("neuer_ordner"):
     st.session_state.index_status = indexiere_mit_anzeige(
@@ -720,193 +946,82 @@ if "index_status" not in st.session_state:
 # Stufe 2 (Scans lesen, Suchvektoren) läuft im Hintergrund weiter
 pdf_indexer.starte_hintergrund()
 
-if st.session_state.get("neue_gespraechs_quellen"):
-    gespraechs_quellen_einlesen(st.session_state.pop("neue_gespraechs_quellen"))
-    st.rerun()
-
-status = st.session_state.index_status
 with st.sidebar:
-    st.header("ℹ️ Übersicht")
-    if isinstance(status.get("fehler"), str):
-        st.warning(f"Unterlagen-Prüfung fehlgeschlagen: {status['fehler'][:150]}")
-    else:
-        st.markdown(f"**{status['gesamt']}** Textabschnitte aus den Unterlagen geladen")
-        if status["neu"] or status["aktualisiert"] or status["geloescht"]:
-            st.caption(
-                f"Gerade aktualisiert: {status['neu']} neu, "
-                f"{status['aktualisiert']} geändert, {status['geloescht']} entfernt"
-            )
-        hintergrund_anzeige()
-        if status.get("fehler"):
-            with st.expander(f"⚠️ {len(status['fehler'])} Datei(en) nicht einlesbar"):
-                st.caption("Wird beim nächsten Start automatisch erneut versucht.")
-                for name in status["fehler"]:
-                    st.markdown(f"- {name}")
-        if status.get("ohne_text"):
-            with st.expander(f"ℹ️ {len(status['ohne_text'])} Datei(en) ohne lesbaren Text"):
-                st.caption("Diese Dateien enthalten keinen Text, den der Assistent nutzen kann.")
-                for name in status["ohne_text"]:
-                    st.markdown(f"- {name}")
+    seitenleiste(st.session_state.index_status)
 
-    st.divider()
-    ordner_ui()
-    st.divider()
-    gespraechs_quellen_ui()
-    st.divider()
-    st.subheader("⚖️ Dokumente vergleichen")
-    vergleich_oeffnen = st.button("Zwei Dokumente vergleichen …")
-    st.divider()
+# Kopfzeile mit Titel und Gesprächs-Aktionen (immer sichtbar, bei leerem Gespräch ausgegraut)
+leer = not st.session_state.chat
+erste = "" if leer else st.session_state.chat[0]["text"]
+spalte_titel, spalte_aktionen = st.columns([3, 2], vertical_alignment="center")
+spalte_titel.markdown(f"#### {erste[:70]}{'…' if len(erste) > 70 else ''}" if erste else "&nbsp;")
+hilfe_leer = " – zuerst eine Frage stellen" if leer else ""
+with spalte_aktionen.container(horizontal=True, horizontal_alignment="right", gap="small"):
+    st.button("Als PDF", icon=":material/picture_as_pdf:", disabled=leer,
+              on_click=oeffne_dialog, args=("pdf",), help="Gespräch als PDF speichern" + hilfe_leer)
+    st.button("Als E-Mail", icon=":material/mail:", disabled=leer,
+              on_click=oeffne_dialog, args=("email",), help="Zusammenfassung für eine E-Mail" + hilfe_leer)
 
-    web_modus = st.radio(
-        "🌐 Internetsuche",
-        ["Automatisch", "Immer", "Nie"],
-        help="Automatisch: Das Internet wird nur befragt, wenn die eigenen "
-             "Unterlagen nicht ausreichen.",
-    )
+if st.session_state.get("nur_pfade"):
+    namen = ", ".join(Path(p).name for p in st.session_state.nur_pfade[:3])
+    mehr = len(st.session_state.nur_pfade) - 3
+    st.info(f"Dieses Gespräch dreht sich nur um: **{namen}**"
+            + (f" und {mehr} weitere" if mehr > 0 else ""), icon=":material/filter_alt:")
+for hinweis in st.session_state.pop("auswahl_hinweise", []):
+    st.warning(hinweis)
 
-    if st.button("🆕 Neues Gespräch beginnen"):
-        st.session_state.chat = []
-        st.session_state.gespraechs_id = str(uuid.uuid4())
-        st.session_state.pop("zusammenfassung", None)
-        st.session_state.pop("gespraech_pdf", None)
-        st.rerun()
+# Begrüßung bei leerem Gespräch
+if not st.session_state.chat:
+    st.markdown("<div style='text-align:center;padding-top:6vh'>"
+                "<h2>Was möchten Sie wissen?</h2>"
+                "<p style='opacity:.7'>Ich suche die Antwort in Ihren Unterlagen und nenne die Fundstellen.</p>"
+                "</div>", unsafe_allow_html=True)
+    with st.container(horizontal=True, horizontal_alignment="center", gap="small"):
+        for beispiel in ("Wann endet der Verwaltervertrag?",
+                         "Was wurde zuletzt beschlossen?",
+                         "Wie hoch ist die Erhaltungsrücklage?"):
+            if st.button(beispiel):
+                st.session_state.vorschlag = beispiel
 
-    st.divider()
-    st.subheader("📧 Zusammenfassung")
-    if st.button("Gespräch zusammenfassen", disabled=not st.session_state.chat):
-        with st.spinner("Zusammenfassung wird erstellt …"):
-            try:
-                st.session_state.zusammenfassung = erzeuge_zusammenfassung()
-            except Exception as e:
-                text = str(e)
-                if "503" in text or "overloaded" in text.lower() or "unavailable" in text.lower():
-                    st.warning("Die KI ist gerade stark ausgelastet. Bitte eine Minute warten und es erneut versuchen.")
-                elif "RESOURCE_EXHAUSTED" in text or "429" in text:
-                    st.warning("Die kostenlose KI-Stufe ist kurz ausgeschöpft. Bitte eine Minute warten und es erneut versuchen.")
-                else:
-                    st.error(f"Zusammenfassung fehlgeschlagen: {text[:150]}")
-    if st.session_state.get("zusammenfassung"):
-        zsf = st.session_state.zusammenfassung
-        st.text_area("Zusammenfassung", zsf, height=200)
-        betreff = f"Beirat-Gespräch vom {datetime.now().strftime('%d.%m.%Y')}"
-        mailto = (
-            "mailto:?subject=" + urllib.parse.quote(betreff)
-            + "&body=" + urllib.parse.quote(zsf[:1500])
-        )
-        st.link_button("📧 Im E-Mail-Programm öffnen", mailto)
-        st.download_button(
-            "💾 Als Textdatei speichern", zsf,
-            file_name=f"{betreff}.txt",
-        )
-
-    st.divider()
-    st.subheader("📄 Gespräch als PDF")
-    if st.button("Gesamtes Gespräch als PDF erstellen", disabled=not st.session_state.chat):
-        with st.spinner("PDF wird erstellt …"):
-            try:
-                st.session_state.gespraech_pdf = pdf_export.erzeuge_pdf_gespraech(
-                    st.session_state.chat
-                )
-            except Exception as e:
-                st.error(f"PDF-Erstellung fehlgeschlagen: {str(e)[:150]}")
-    if st.session_state.get("gespraech_pdf"):
-        st.download_button(
-            "💾 PDF speichern unter …", st.session_state.gespraech_pdf,
-            file_name=f"Beirat-Gespraech_{datetime.now().strftime('%Y-%m-%d_%H%M')}.pdf",
-            mime="application/pdf",
-        )
-
-    st.divider()
-    st.subheader("🕐 Frühere Gespräche")
-    gruppen = gruppiere_verlauf(lade_verlauf())
-    if not gruppen:
-        st.caption("Noch keine früheren Gespräche.")
-    for gruppe in gruppen[:15]:
-        zeit = gruppe["eintraege"][0].get("zeit", "")[:16].replace("T", " ")
-        erste_frage = gruppe["eintraege"][0]["frage"][:45]
-        aktiv = gruppe["id"] == st.session_state.gespraechs_id
-        titel = f"{'🟢 ' if aktiv else ''}{zeit} · {len(gruppe['eintraege'])} Frage(n) · {erste_frage}"
-        loesch_key = f"loeschen_{gruppe['id']}"
-        with st.expander(titel):
-            for e in gruppe["eintraege"]:
-                st.markdown(f"**Frage:** {e['frage']}")
-                st.caption(e["antwort"][:300] + ("…" if len(e["antwort"]) > 300 else ""))
-
-            if st.session_state.get(loesch_key):
-                st.warning("Dieses Gespräch wirklich unwiderruflich löschen?")
-                spalte_ja, spalte_nein = st.columns(2)
-                if spalte_ja.button("Ja, löschen", key=f"{loesch_key}_ja"):
-                    loesche_gespraech(gruppe["id"])
-                    st.session_state.pop(loesch_key, None)
-                    if aktiv:
-                        st.session_state.chat = []
-                        st.session_state.gespraechs_id = str(uuid.uuid4())
-                        st.session_state.pop("zusammenfassung", None)
-                        st.session_state.pop("gespraech_pdf", None)
-                    st.rerun()
-                if spalte_nein.button("Abbrechen", key=f"{loesch_key}_nein"):
-                    st.session_state.pop(loesch_key, None)
-                    st.rerun()
-            elif aktiv:
-                st.caption("Das ist das aktuell geöffnete Gespräch.")
-                if st.button("🗑️ Löschen", key=f"{loesch_key}_btn"):
-                    st.session_state[loesch_key] = True
-                    st.rerun()
-            else:
-                spalte_fortsetzen, spalte_loeschen = st.columns(2)
-                if spalte_fortsetzen.button("▶️ Fortsetzen", key=f"fortsetzen_{gruppe['id']}"):
-                    st.session_state.chat = gruppe_zu_chat(gruppe)
-                    st.session_state.gespraechs_id = gruppe["id"]
-                    st.session_state.pop("zusammenfassung", None)
-                    st.session_state.pop("gespraech_pdf", None)
-                    st.rerun()
-                if spalte_loeschen.button("🗑️ Löschen", key=f"{loesch_key}_btn"):
-                    st.session_state[loesch_key] = True
-                    st.rerun()
-    if len(gruppen) > 15:
-        st.caption(f"… und {len(gruppen) - 15} weitere ältere Gespräche.")
-
-    st.caption("Hinweis: Die Antworten ersetzen keine Rechtsberatung.")
-
-if vergleich_oeffnen:
-    vergleich_dialog()
-
-# Bisherige Nachrichten dieser Sitzung anzeigen
+# Bisherige Nachrichten
 for idx, nachricht in enumerate(st.session_state.chat):
     with st.chat_message("user" if nachricht["rolle"] == "user" else "assistant"):
         st.markdown(nachricht["text"])
         if nachricht["rolle"] == "assistent":
-            zeige_quellen(
-                nachricht.get("doks", []), nachricht.get("webs", []),
-                nachricht["text"], key_prefix=f"alt{idx}",
-            )
-            vorherige_frage = st.session_state.chat[idx - 1]["text"] if idx > 0 else ""
-            pdf_export_ui(
-                vorherige_frage, nachricht["text"], key_prefix=f"alt{idx}",
-                doks=nachricht.get("doks", []), webs=nachricht.get("webs", []),
-            )
+            zeige_quellen(nachricht.get("doks", []), nachricht.get("webs", []),
+                          nachricht["text"], key_prefix=f"alt{idx}")
 
-frage = st.chat_input("Frage stellen — z. B.: Wer zahlt die Erneuerung der Rolltore?")
+with st.bottom:
+    eingabe_leiste()
+    eingabe = st.chat_input("Frage stellen …")
+
+dialog = st.session_state.pop("dialog", None)
+if dialog == "dokumente":
+    dokument_dialog()
+elif dialog == "vergleich":
+    vergleich_dialog()
+elif dialog == "pdf":
+    pdf_dialog()
+elif dialog == "email":
+    email_dialog()
+elif dialog == "ordner":
+    ordner_dialog()
+
+frage = eingabe or st.session_state.pop("vorschlag", None)
 if frage:
     st.session_state.chat.append({"rolle": "user", "text": frage})
     with st.chat_message("user"):
         st.markdown(frage)
-
     with st.chat_message("assistant"):
         try:
             with st.spinner("Unterlagen werden durchsucht und Antwort erstellt …"):
-                antwort, doks, webs = beantworte_frage(frage, web_modus)
+                antwort, doks, webs = beantworte_frage(
+                    frage, st.session_state.web_modus,
+                    st.session_state.get("nur_pfade"),
+                )
         except Exception as e:
             antwort = fehlertext_ki(e)
             doks, webs = [], []
         st.markdown(antwort)
-        zeige_quellen(doks, webs, antwort, key_prefix=f"neu{len(st.session_state.chat)}")
-        pdf_export_ui(
-            frage, antwort, key_prefix=f"neu{len(st.session_state.chat)}",
-            doks=doks, webs=webs,
-        )
-
-    st.session_state.chat.append(
-        {"rolle": "assistent", "text": antwort, "doks": doks, "webs": webs}
-    )
+    st.session_state.chat.append({"rolle": "assistent", "text": antwort, "doks": doks, "webs": webs})
     speichere_im_verlauf(frage, antwort, doks, webs)
+    st.rerun()

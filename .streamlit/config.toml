@@ -1,0 +1,17 @@
+# Festes helles Erscheinungsbild — unabhängig davon, ob Windows/Browser im
+# dunklen Modus laufen (sonst passt die Gestaltung nicht).
+[theme]
+base = "light"
+primaryColor = "#2563eb"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f4f5"
+textColor = "#1f2328"
+borderColor = "#e4e4e7"
+baseRadius = "medium"
+
+[theme.sidebar]
+backgroundColor = "#f7f7f8"
+secondaryBackgroundColor = "#ececf1"
+
+[client]
+toolbarMode = "minimal"

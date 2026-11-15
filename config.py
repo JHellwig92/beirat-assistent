@@ -63,6 +63,7 @@ MANIFEST_PFAD = DATEN_ORDNER / "dokument_manifest.json"
 LOG_PFAD = DATEN_ORDNER / "einlesen.log"
 ORDNER_LISTE_PFAD = DATEN_ORDNER / "ordner.json"      # zusätzliche Ordner + Ein/Aus
 OCR_CACHE_ORDNER = DATEN_ORDNER / "ocr_cache"         # erkannter Text aus Scans
+EINSTELLUNGEN_PFAD = DATEN_ORDNER / "einstellungen.json"   # Internetsuche, Anzahl Fundstellen
 GESPRAECH_QUELLEN_PFAD = DATEN_ORDNER / "gespraech_quellen.json"
 GESPRAECH_DATEIEN_ORDNER = DATEN_ORDNER / "gespraech_dateien"  # hochgeladene Dateien
 
@@ -70,7 +71,7 @@ UNTERSTUETZTE_TYPEN = {".pdf", ".docx", ".txt"}
 MAX_CHUNK_LAENGE = 900
 CHUNK_UEBERLAPPUNG = 150
 MAX_PDF_ERGEBNISSE = 10      # Textstellen, die pro Frage an die KI gehen
-MAX_PRO_DATEI = 3            # höchstens so viele davon aus derselben Datei
+MAX_PRO_DATEI = 3            # höchstens so viele Textstellen aus derselben Datei
 SUCH_KANDIDATEN = 40         # Vorauswahl je Suchverfahren vor dem Zusammenführen
 GESPRAECH_ERGEBNISSE = 6     # zusätzliche Textstellen aus den Quellen nur für dieses Gespräch
 MAX_VERGLEICH_ZEICHEN = 300_000   # je Dokument beim Dokumentenvergleich (~75.000 Wörter)

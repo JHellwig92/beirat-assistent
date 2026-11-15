@@ -52,14 +52,19 @@ class _StichwortIndex:
         n = len(self.tf)
         self.idf = {w: math.log(1 + (n - d + 0.5) / (d + 0.5)) for w, d in df.items()}
 
-    def suche(self, frage: str, erlaubt: set[str], anzahl: int) -> list[str]:
+    def suche(self, frage: str, erlaubt: set[str], anzahl: int,
+              pfade: set[str] | None = None) -> list[str]:
+        """erlaubt = Ordner; pfade (falls angegeben) = nur genau diese Dateien."""
         begriffe = set(_woerter(frage))
         if not begriffe:
             return []
         k1, b = 1.5, 0.75
         punkte = []
         for i, tf in enumerate(self.tf):
-            if self.metas[i]["ordner"] not in erlaubt:
+            if pfade is not None:
+                if self.metas[i]["pfad"] not in pfade:
+                    continue
+            elif self.metas[i]["ordner"] not in erlaubt:
                 continue
             s = 0.0
             for w in begriffe:
@@ -82,13 +87,16 @@ def _stichwort_index() -> _StichwortIndex:
     return _cache["index"]
 
 
-def _rangliste(idx: _StichwortIndex, frage: str, vektor, ordner: list[str]) -> list[str]:
-    """Bedeutungs- und Stichwortsuche in den angegebenen Ordnern, zusammengeführt
-    per Reciprocal Rank Fusion (wer in beiden Listen weit oben steht, gewinnt)."""
-    listen = [idx.suche(frage, set(ordner), config.SUCH_KANDIDATEN)]
+def _rangliste(idx: _StichwortIndex, frage: str, vektor, ordner: list[str],
+               pfade: list[str] | None = None, kandidaten: int | None = None) -> list[str]:
+    """Bedeutungs- und Stichwortsuche in den angegebenen Ordnern (oder nur in den
+    angegebenen Dateien), zusammengeführt per Reciprocal Rank Fusion (wer in
+    beiden Listen weit oben steht, gewinnt)."""
+    kandidaten = kandidaten or config.SUCH_KANDIDATEN
+    listen = [idx.suche(frage, set(ordner), kandidaten, set(pfade) if pfade is not None else None)]
     if vektor is not None:
         try:
-            listen.append(vektoren.suche(vektor, ordner, config.SUCH_KANDIDATEN))
+            listen.append(vektoren.suche(vektor, ordner, kandidaten, pfade))
         except Exception as e:
             print(f"[!] Bedeutungssuche fehlgeschlagen: {str(e)[:150]}")
     punkte: dict[str, float] = {}
@@ -119,16 +127,20 @@ def _auswahl(idx: _StichwortIndex, rangliste: list[str], anzahl: int, max_pro_da
     return ergebnis
 
 
-def suche_dokumente(frage: str, gespraechs_id: str | None = None) -> list[dict]:
-    """Textstellen für eine Frage: zuerst aus den Quellen nur für dieses Gespräch
-    (eigene Plätze, damit sie nicht von den großen Unterlagen verdrängt werden),
-    dann aus den eingeschalteten Unterlagen-Ordnern."""
+def suche_dokumente(frage: str, gespraechs_id: str | None = None,
+                    nur_pfade: list[str] | None = None) -> list[dict]:
+    """Textstellen für eine Frage.
+
+    - nur_pfade: Gespräch nur zu bestimmten Dokumenten — dann wird ausschließlich in
+      diesen Dateien gesucht (auch wenn ihr Ordner gerade ausgeschaltet ist).
+    - Sonst: zuerst Dateien, die diesem Gespräch hinzugefügt wurden (eigene Plätze),
+      dann die eingeschalteten Unterlagen-Ordner."""
     idx = _stichwort_index()
     if not idx.ids:
         return []
     aktive = pdf_indexer.aktive_ordner()
     hat_gespraechsquellen = bool(gespraechs_id and pdf_indexer.gespraechs_quellen(gespraechs_id))
-    if not aktive and not hat_gespraechsquellen:
+    if not nur_pfade and not aktive and not hat_gespraechsquellen:
         return []
 
     vektor = None
@@ -139,6 +151,13 @@ def suche_dokumente(frage: str, gespraechs_id: str | None = None) -> list[dict]:
         print(f"[!] Bedeutungssuche nicht verfügbar, nutze nur Stichworte: {str(e)[:150]}")
 
     gesehen: set = set()
+    if nur_pfade:
+        # Ausgewählte Dokumente: alle davon nutzen, bei wenigen mehr Stellen je Dokument
+        gesamt = config.MAX_PDF_ERGEBNISSE
+        pro_datei = max(config.MAX_PRO_DATEI, gesamt // len(nur_pfade))
+        return _auswahl(idx, _rangliste(idx, frage, vektor, [], list(nur_pfade)),
+                        gesamt, pro_datei, gesehen)
+
     ergebnis = []
     if hat_gespraechsquellen:
         tag = pdf_indexer.gespraechs_tag(gespraechs_id)

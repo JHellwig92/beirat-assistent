@@ -91,11 +91,15 @@ def entferne(ids: list[str]):
             pass
 
 
-def suche(vektor: list[float], ordner: list[str], anzahl: int) -> list[str]:
+def suche(vektor: list[float], ordner: list[str], anzahl: int,
+          pfade: list[str] | None = None) -> list[str]:
+    """Ähnlichste Abschnitte in den Ordnern — oder, falls pfade angegeben, nur in
+    genau diesen Dateien."""
     col = collection()
     menge = col.count()
     if not menge:
         return []
+    filter_ = {"pfad": {"$in": list(pfade)}} if pfade is not None else {"ordner": {"$in": ordner}}
     res = col.query(query_embeddings=[vektor], n_results=min(anzahl, menge),
-                    where={"ordner": {"$in": ordner}}, include=[])
+                    where=filter_, include=[])
     return res["ids"][0]

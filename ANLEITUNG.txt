@@ -34,51 +34,53 @@ WAS KANN DER ASSISTENT NOCH?
 ------------------------------------------------------------
 - QUELLEN ÖFFNEN: Unter jeder Antwort stehen die Quellen.
   Ein Klick auf ein Dokument öffnet die Datei direkt.
-- UNTERLAGEN-ORDNER: Links in der Seitenleiste stehen die
-  Ordner, die der Assistent durchsucht. Mit dem Häkchen
-  schaltest du einen Ordner ein oder aus — das wirkt sofort.
-  Mit "Ordner hinzufügen" kannst du weitere Ordner dazunehmen
-  (z. B. von einem USB-Stick). Der Ordner wird einmal
-  eingelesen und bleibt in der Liste, bis du ihn mit
-  "Aus Liste entfernen" wieder herausnimmst. Deine Dateien
-  werden dabei nie gelöscht.
-- NUR FÜR DIESES GESPRÄCH: Wenn du Unterlagen nur für eine
-  einzelne Frage oder Sitzung brauchst, kannst du sie in der
-  Seitenleiste unter "Nur für dieses Gespräch" hochladen
-  (oder einen Ordner wählen). Der Assistent schaut dann in
-  diesem Gespräch zuerst dort hinein. In anderen Gesprächen
-  tauchen diese Dateien nicht auf.
-- DOKUMENTE VERGLEICHEN: In der Seitenleiste auf "Zwei
-  Dokumente vergleichen" klicken, zwei Dokumente auswählen
-  (oder hochladen) und auf "Vergleichen" klicken. Der
-  Vergleich erscheint als Antwort im Gespräch — du kannst
-  danach Rückfragen stellen oder ihn als PDF speichern.
-- INTERNETSUCHE: Links in der Seitenleiste einstellbar
-  (Automatisch / Immer / Nie).
-- E-MAIL: In der Seitenleiste auf "Gespräch zusammenfassen"
-  klicken — dann "Im E-Mail-Programm öffnen". Die
-  Zusammenfassung steht dann fertig in einer neuen E-Mail.
-- FRÜHERE GESPRÄCHE FORTSETZEN: In der Seitenleiste unter
-  "Frühere Gespräche" stehen alle bisherigen Unterhaltungen.
-  Draufklicken zeigt die alten Fragen und Antworten. Mit dem
-  Knopf "Gespräch fortsetzen" wird die Unterhaltung wieder
-  geöffnet — du kannst direkt weiterfragen, als hättest du
-  nie aufgehört.
-- ALS PDF SPEICHERN: Unter jeder Antwort auf "Als PDF speichern"
-  klicken. Du kannst wählen, wie der Inhalt aufbereitet wird
-  (z. B. als Beschlussvorlage, als Liste oder als Brief) oder
-  bei "Eigene Anweisung" frei beschreiben, wie es aussehen soll —
-  auch mit Farben und Gestaltung, z. B. "als Flyer in Pink
-  gehalten" oder "als Tabelle, dezent in Blau". Dann auf
-  "PDF erstellen" und danach "PDF speichern unter …" klicken.
-  In der Seitenleiste unter "Gespräch als PDF" lässt sich auch
-  das ganze Gespräch auf einmal als PDF speichern (dort immer
-  im normalen, unveränderten Layout).
-  TIPP: Damit der Browser wirklich nach dem Speicherort fragt
-  (statt automatisch in "Downloads" zu speichern), einmalig in
-  den Browser-Einstellungen "Vor dem Download jedes Mal
-  Speicherort abfragen" aktivieren (bei Chrome/Edge unter
-  Einstellungen → Downloads).
+
+KNÖPFE ÜBER DEM EINGABEFELD:
+- "ALLE UNTERLAGEN": Normalerweise sucht der Assistent in
+  allen Unterlagen. Hier auf "Bestimmte Dokumente wählen"
+  klicken, wenn sich ein Gespräch nur um einzelne Dokumente
+  drehen soll (z. B. nur um den Verwaltervertrag). Namen
+  eintippen, auswählen, "Übernehmen". Auch Dateien vom
+  Computer oder von einem Stick lassen sich dort hinzufügen.
+  Mit "Wieder alle Unterlagen" geht es zurück.
+- "INTERNET": Automatisch (nur wenn die Unterlagen nicht
+  reichen), Immer oder Nie. Die Einstellung bleibt erhalten.
+- "VERGLEICHEN": Zuerst wählen, wie viele Dokumente
+  verglichen werden sollen (2 bis 5), dann die Dokumente
+  aussuchen und auf "Vergleichen" klicken. Der Vergleich
+  erscheint als Antwort im Gespräch — danach kannst du
+  Rückfragen stellen.
+
+OBEN RECHTS IM GESPRÄCH:
+- "ALS PDF": Das ganze Gespräch als PDF speichern. Du kannst
+  wählen, wie es aussehen soll: wie im Chat, als
+  Beschlussvorlage, als Liste, als Brief — oder bei "Eigene
+  Anweisung" frei beschreiben, z. B. "als Tabelle, dezent in
+  Blau". Dann "PDF erstellen" und "PDF speichern".
+  TIPP: Damit der Browser nach dem Speicherort fragt (statt
+  automatisch in "Downloads" zu speichern), einmalig in den
+  Browser-Einstellungen "Vor dem Download jedes Mal
+  Speicherort abfragen" aktivieren (Chrome/Edge: Einstellungen
+  → Downloads).
+- "ALS E-MAIL": Der Assistent fasst das Gespräch zusammen.
+  Den Text kannst du noch ändern und dann mit "Im
+  E-Mail-Programm öffnen" in eine neue E-Mail übernehmen.
+  (Die Knöpfe sind grau, solange noch keine Frage gestellt
+  wurde.)
+
+LINKS IN DER SEITENLEISTE:
+- "NEUES GESPRÄCH" beginnt eine neue Unterhaltung.
+- FRÜHERE GESPRÄCHE: Ein Klick öffnet das Gespräch wieder —
+  du kannst direkt weiterfragen. Zum Löschen mit der Maus
+  über das Gespräch fahren und auf die drei Punkte klicken.
+- "UNTERLAGEN-ORDNER VERWALTEN": Hier stehen die Ordner, die
+  der Assistent durchsucht. Mit dem Häkchen schaltest du
+  einen Ordner ein oder aus. Mit "Ordner hinzufügen" kommen
+  weitere Ordner dazu (z. B. von einem USB-Stick), mit "Aus
+  Liste entfernen" wieder heraus. Deine Dateien werden dabei
+  nie gelöscht.
+- Die Seitenleiste lässt sich einklappen; der kleine Pfeil
+  oben links klappt sie wieder auf.
 
 
 WENN ETWAS NICHT KLAPPT
@@ -108,8 +110,8 @@ WENN ETWAS NICHT KLAPPT
   Grafikkarte selbst (Lüfter kann hörbar werden). Danach
   gibt er die Grafikkarte sofort wieder frei.
 - Neue Dateien in den Ordner gelegt, während der Assistent
-  läuft? In der Seitenleiste auf "Unterlagen jetzt neu
-  prüfen" klicken.
+  läuft? Links auf "Unterlagen-Ordner verwalten" und dann
+  auf "Unterlagen jetzt neu prüfen" klicken.
 
 WICHTIG: Die Antworten sind eine Hilfe zur Orientierung —
 sie ersetzen keine Rechtsberatung.

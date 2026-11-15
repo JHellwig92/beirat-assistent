@@ -13,12 +13,14 @@ entladen. Index, Verlauf und Einstellungen bleiben auf dem Rechner. An Gemini ge
 die jeweils relevanten Textauszüge, beim Dokumentenvergleich die beiden Dokumente.
 
 ## Funktionen
+- Oberfläche im Stil gängiger Chat-Assistenten: links die Gespräche, Einstellungen
+  direkt am Eingabefeld.
 - Fragen zu den eigenen Unterlagen. Jede Quelle lässt sich per Klick öffnen.
 - Texterkennung für eingescannte PDFs (lokal mit `qwen3-vl`, Zwischenspeicher je Seite;
   Gemini nur als Ersatz, falls Ollama fehlt).
 - Mehrere Unterlagen-Ordner mit Ein/Aus-Schalter.
-- Dateien oder Ordner nur für ein einzelnes Gespräch.
-- Dokumentenvergleich (zwei Dokumente, mit optionalem Schwerpunkt).
+- Gespräch zu bestimmten Dokumenten (aus den Unterlagen oder vom Computer).
+- Dokumentenvergleich (zwei bis fünf Dokumente, mit optionalem Schwerpunkt).
 - Gesprächsverlauf, PDF-Export, E-Mail-Zusammenfassung.
 - Zweistufiges Einlesen: Dateien sind nach kurzer Zeit per Stichwort auffindbar;
   Texterkennung und Suchindex laufen im Hintergrund weiter.
